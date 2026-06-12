@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'grading_result_view.dart';
 
 class SubmitItemView extends StatefulWidget {
   const SubmitItemView({super.key});
@@ -9,11 +10,9 @@ class SubmitItemView extends StatefulWidget {
 }
 
 class _SubmitItemViewState extends State<SubmitItemView> {
-  // --- NEW: State variables to hold our images ---
   final ImagePicker _picker = ImagePicker();
   List<XFile> _selectedImages = [];
 
-  // --- NEW: The function that opens the file browser ---
   Future<void> _pickImages() async {
     try {
       final List<XFile> pickedFiles = await _picker.pickMultiImage();
@@ -75,15 +74,48 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // We will wire this to the AI grading mock next!
+                    onPressed: () async {
                       if (_selectedImages.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Please upload at least one photo!')),
                         );
                         return;
                       }
-                      // Proceed to grade...
+                      
+                      // 1. Show the "AI Processing" loading spinner
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(color: Color(0xFFFF9900)),
+                                  SizedBox(height: 16),
+                                  Text("Running AWS Vision AI...", style: TextStyle(fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      // 2. Wait 2 seconds to simulate AWS Bedrock/Lambda latency
+                      await Future.delayed(const Duration(seconds: 2));
+
+                      // 3. Close the loading spinner
+                      if (context.mounted) Navigator.pop(context);
+
+                      // 4. Navigate to the Result Screen
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const GradingResultView()),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.auto_awesome),
                     label: const Text(
@@ -142,7 +174,7 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                   children: [
                     _buildLabel('CATEGORY'),
                     DropdownButtonFormField<String>(
-                      isExpanded: true, 
+                      isExpanded: true,
                       decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
                       items: const [
                         DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
@@ -246,7 +278,6 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           const Divider(),
           const SizedBox(height: 16),
 
-          // --- NEW: Clickable Upload Area ---
           InkWell(
             onTap: _pickImages,
             borderRadius: BorderRadius.circular(8),
@@ -314,7 +345,6 @@ class _SubmitItemViewState extends State<SubmitItemView> {
     );
   }
 
-  // --- NEW: Dynamic Thumbnails ---
   Widget _buildThumbnail(String label, int index) {
     final bool hasImage = _selectedImages.length > index;
     
