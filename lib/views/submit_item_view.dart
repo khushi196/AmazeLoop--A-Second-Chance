@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
-class SubmitItemView extends StatelessWidget {
+class SubmitItemView extends StatefulWidget {
   const SubmitItemView({super.key});
+
+  @override
+  State<SubmitItemView> createState() => _SubmitItemViewState();
+}
+
+class _SubmitItemViewState extends State<SubmitItemView> {
+  // --- NEW: State variables to hold our images ---
+  final ImagePicker _picker = ImagePicker();
+  List<XFile> _selectedImages = [];
+
+  // --- NEW: The function that opens the file browser ---
+  Future<void> _pickImages() async {
+    try {
+      final List<XFile> pickedFiles = await _picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _selectedImages.addAll(pickedFiles);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking images: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +76,14 @@ class SubmitItemView extends StatelessWidget {
                 children: [
                   ElevatedButton.icon(
                     onPressed: () {
-                      // We will wire this to the AI grading mock later!
+                      // We will wire this to the AI grading mock next!
+                      if (_selectedImages.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please upload at least one photo!')),
+                        );
+                        return;
+                      }
+                      // Proceed to grade...
                     },
                     icon: const Icon(Icons.auto_awesome),
                     label: const Text(
@@ -111,6 +142,7 @@ class SubmitItemView extends StatelessWidget {
                   children: [
                     _buildLabel('CATEGORY'),
                     DropdownButtonFormField<String>(
+                      isExpanded: true, 
                       decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
                       items: const [
                         DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
@@ -131,6 +163,7 @@ class SubmitItemView extends StatelessWidget {
                   children: [
                     _buildLabel('REASON FOR RETURN'),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
                       items: const [
                         DropdownMenuItem(value: 'return', child: Text('Returned Amazon order')),
@@ -213,27 +246,45 @@ class SubmitItemView extends StatelessWidget {
           const Divider(),
           const SizedBox(height: 16),
 
-          // Main Upload Area
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 48),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9F9F9),
-              border: Border.all(color: Colors.grey.shade400, width: 2), // Simulating the dashed border
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.grey.shade200,
-                  child: const Icon(Icons.upload, color: Color(0xFF0F1111)),
-                ),
-                const SizedBox(height: 16),
-                const Text('Drag & Drop high-res photos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text('or click to browse files', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-              ],
+          // --- NEW: Clickable Upload Area ---
+          InkWell(
+            onTap: _pickImages,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              decoration: BoxDecoration(
+                color: _selectedImages.isNotEmpty ? const Color(0xFFFF9900).withOpacity(0.05) : const Color(0xFFF9F9F9),
+                border: Border.all(
+                  color: _selectedImages.isNotEmpty ? const Color(0xFFFF9900) : Colors.grey.shade400, 
+                  width: 2,
+                ), 
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: _selectedImages.isNotEmpty ? const Color(0xFFFF9900) : Colors.grey.shade200,
+                    child: Icon(
+                      _selectedImages.isNotEmpty ? Icons.check : Icons.upload, 
+                      color: _selectedImages.isNotEmpty ? Colors.white : const Color(0xFF0F1111)
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _selectedImages.isNotEmpty 
+                        ? '${_selectedImages.length} Photo(s) Attached' 
+                        : 'Click to upload high-res photos', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _selectedImages.isNotEmpty ? 'Click again to add more' : 'Supports JPG, PNG', 
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14)
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -241,11 +292,11 @@ class SubmitItemView extends StatelessWidget {
           // Thumbnails
           Row(
             children: [
-              Expanded(child: _buildThumbnail('Front')),
+              Expanded(child: _buildThumbnail('Front', 0)),
               const SizedBox(width: 16),
-              Expanded(child: _buildThumbnail('Side')),
+              Expanded(child: _buildThumbnail('Side', 1)),
               const SizedBox(width: 16),
-              Expanded(child: _buildThumbnail('Back')),
+              Expanded(child: _buildThumbnail('Back', 2)),
             ],
           )
         ],
@@ -263,24 +314,37 @@ class SubmitItemView extends StatelessWidget {
     );
   }
 
-  Widget _buildThumbnail(String label) {
+  // --- NEW: Dynamic Thumbnails ---
+  Widget _buildThumbnail(String label, int index) {
+    final bool hasImage = _selectedImages.length > index;
+    
     return Column(
       children: [
         AspectRatio(
           aspectRatio: 1,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
+              color: hasImage ? const Color(0xFFFF9900).withOpacity(0.1) : Colors.white,
+              border: Border.all(color: hasImage ? const Color(0xFFFF9900) : Colors.grey.shade300),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Center(
-              child: Icon(Icons.add_photo_alternate_outlined, color: Colors.grey),
+            child: Center(
+              child: Icon(
+                hasImage ? Icons.image : Icons.add_photo_alternate_outlined, 
+                color: hasImage ? const Color(0xFFFF9900) : Colors.grey
+              ),
             ),
           ),
         ),
         const SizedBox(height: 8),
-        Text(label.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        Text(
+          hasImage ? "ATTACHED" : label.toUpperCase(), 
+          style: TextStyle(
+            fontSize: 12, 
+            fontWeight: FontWeight.bold,
+            color: hasImage ? const Color(0xFFFF9900) : Colors.black
+          )
+        ),
       ],
     );
   }
