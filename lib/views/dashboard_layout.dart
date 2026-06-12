@@ -11,15 +11,27 @@ class DashboardLayout extends StatefulWidget {
 
 class _DashboardLayoutState extends State<DashboardLayout> {
   int _selectedIndex = 0;
+  Widget? _currentCustomView; // Holds screens like Grading Result, Routing, etc.
 
-  // The screens that will swap out in the main content area
-  final List<Widget> _pages = [
-    const SubmitItemView(),
-    const HistoryView(),
-  ];
+  // A method to swap the main content area from any child screen
+  void _changeView(Widget newView) {
+    setState(() {
+      _currentCustomView = newView;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Determine what to show in the main area
+    Widget mainContent;
+    if (_currentCustomView != null) {
+      mainContent = _currentCustomView!;
+    } else {
+      mainContent = _selectedIndex == 0 
+          ? SubmitItemView(onNavigate: _changeView) 
+          : const HistoryView();
+    }
+
     return Scaffold(
       body: Row(
         children: [
@@ -30,54 +42,29 @@ class _DashboardLayoutState extends State<DashboardLayout> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Brand Header
                 const Padding(
                   padding: EdgeInsets.fromLTRB(24, 32, 24, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'AmazeLoop',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      Text('AmazeLoop', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
                       SizedBox(height: 4),
-                      Text(
-                        'A Second Chance',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      Text('A Second Chance', style: TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                 ),
-                // Navigation Links
                 _buildNavItem(0, 'Grade New Item', Icons.add_box),
                 _buildNavItem(1, 'History', Icons.history),
                 const Spacer(),
-                // Logout Button
                 InkWell(
-                  onTap: () {
-                    // Route back to the login screen
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
+                  onTap: () => Navigator.pushReplacementNamed(context, '/login'),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                     child: Row(
                       children: [
                         Icon(Icons.logout, color: Colors.grey.shade400, size: 20),
                         const SizedBox(width: 16),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 14,
-                          ),
-                        ),
+                        Text('Logout', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
                       ],
                     ),
                   ),
@@ -99,7 +86,6 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // Search Bar
                       SizedBox(
                         width: 250,
                         height: 36,
@@ -109,36 +95,22 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             hintStyle: const TextStyle(fontSize: 14),
                             prefixIcon: const Icon(Icons.search, size: 18),
                             contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(4),
-                              borderSide: BorderSide.none,
-                            ),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide.none),
                           ),
                         ),
                       ),
                       const SizedBox(width: 24),
-                      // Actions
-                      IconButton(
-                        icon: const Icon(Icons.notifications_none, color: Colors.white70),
-                        onPressed: () {},
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-                        onPressed: () {},
-                      ),
+                      IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white70), onPressed: () {}),
+                      IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white70), onPressed: () {}),
                       const SizedBox(width: 16),
-                      const CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Color(0xFFFF9900), // Amazon Orange
-                        child: Text('EV', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
+                      const CircleAvatar(radius: 16, backgroundColor: Color(0xFFFF9900), child: Text('EV', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white))),
                     ],
                   ),
                 ),
                 
-                // Dynamic Page Content
+                // Dynamic Page Content (This is what changes!)
                 Expanded(
-                  child: _pages[_selectedIndex],
+                  child: mainContent,
                 ),
               ],
             ),
@@ -148,42 +120,26 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     );
   }
 
-  // Helper widget for Sidebar links
   Widget _buildNavItem(int index, String title, IconData icon) {
-    final isSelected = _selectedIndex == index;
+    final isSelected = _selectedIndex == index && _currentCustomView == null;
     return InkWell(
       onTap: () {
         setState(() {
           _selectedIndex = index;
+          _currentCustomView = null; // Reset any custom view when clicking the sidebar
         });
       },
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF131A22) : Colors.transparent,
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? const Color(0xFFFF9900) : Colors.transparent,
-              width: 4,
-            ),
-          ),
+          border: Border(left: BorderSide(color: isSelected ? const Color(0xFFFF9900) : Colors.transparent, width: 4)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade400,
-              size: 20,
-            ),
+            Icon(icon, color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade400, size: 20),
             const SizedBox(width: 16),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey.shade400,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 14,
-              ),
-            ),
+            Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade400, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal, fontSize: 14)),
           ],
         ),
       ),
