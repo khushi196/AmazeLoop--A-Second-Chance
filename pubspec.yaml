@@ -37,8 +37,8 @@ dependencies:
   image_picker: ^1.2.1
 
   # AWS Amplify
-  amplify_flutter: ^2.7.0
-  amplify_auth_cognito: ^2.7.0
+  amplify_flutter: ^2.5.0
+  amplify_auth_cognito: ^2.5.0
 
   # Networking
   http: ^1.2.0

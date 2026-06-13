@@ -3,7 +3,8 @@ import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'amplifyconfiguration.dart';
 import 'views/login_view.dart';
-import 'views/dashboard_layout.dart';
+import 'views/dashboard_layout.dart'; // Your original seller app
+import 'RoleSelectionScreen.dart';    // The Front Door
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,16 +54,14 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
       title: 'Amazon Loop',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFEAEDED), // Amazon Gray
-        primaryColor: const Color(0xFFFF9900), // Amazon Orange
+        scaffoldBackgroundColor: const Color(0xFFEAEDED), 
+        primaryColor: const Color(0xFFFF9900), 
         colorScheme: ColorScheme.fromSwatch().copyWith(
           primary: const Color(0xFFFF9900),
-          secondary: const Color(0xFF232F3E), // Amazon Squid Ink
+          secondary: const Color(0xFF232F3E), 
           surface: Colors.white,
         ),
         fontFamily: 'Inter',
-        
-        // Global Input Field Styling
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -76,6 +75,7 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
           ),
         ),
       ),
+      // THE MAGIC HAPPENS HERE:
       home: _amplifyError != null
           ? Scaffold(
               body: Center(
@@ -89,7 +89,7 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
               ),
             )
           : _amplifyConfigured
-          ? const LoginView()
+          ? const RoleSelectionScreen() // <--- 1. Starts at the Front Door!
           : const Scaffold(
               body: Center(
                 child: CircularProgressIndicator(color: Color(0xFFFF9900)),
@@ -97,7 +97,7 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
             ),
       routes: {
         '/login': (context) => const LoginView(),
-        '/dashboard': (context) => const DashboardLayout(),
+        '/dashboard': (context) => const DashboardLayout(), // <--- 2. Login routes to Seller App!
       },
     );
   }

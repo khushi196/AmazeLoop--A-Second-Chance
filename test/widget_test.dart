@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-// This imports your actual main file
-import 'package:amazeloop/main.dart'; 
+import 'package:amazeloop/views/login_view.dart';
 
 void main() {
-  testWidgets('App loads Login placeholder', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const AmazonLoopApp());
+  testWidgets('Login view shows the auth form', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginView()));
 
-    // Verify that our Login placeholder text is showing on startup
-    expect(find.text('Login View Placeholder'), findsOneWidget);
+    expect(find.text('AmazeLoop'), findsOneWidget);
+    expect(find.text('EMAIL ADDRESS'), findsOneWidget);
+    expect(find.text('PASSWORD'), findsOneWidget);
+    expect(find.text('SIGN UP'), findsOneWidget);
+    expect(find.text('LOG IN'), findsOneWidget);
   });
 }

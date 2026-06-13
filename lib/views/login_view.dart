@@ -138,7 +138,8 @@ class _LoginViewState extends State<LoginView> {
         return;
       } else {
         setState(() {
-          _message = 'Sign-in not complete. Step required: ${result.nextStep.signInStep}';
+          _message =
+              'Sign-in not complete. Step required: ${result.nextStep.signInStep}';
           _isError = true;
         });
       }
@@ -178,8 +179,13 @@ class _LoginViewState extends State<LoginView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              title: const Text('Verify Your Email', style: TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: const Text(
+                'Verify Your Email',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,14 +195,20 @@ class _LoginViewState extends State<LoginView> {
                     style: TextStyle(color: Colors.grey.shade700),
                   ),
                   const SizedBox(height: 4),
-                  Text(email, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    email,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 20),
                   TextField(
                     controller: _codeController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Enter verification code',
-                      prefixIcon: Icon(Icons.lock_clock_outlined, color: Colors.grey),
+                      prefixIcon: Icon(
+                        Icons.lock_clock_outlined,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                   if (dialogError != null) ...[
@@ -210,7 +222,10 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       child: Text(
                         dialogError!,
-                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -245,7 +260,8 @@ class _LoginViewState extends State<LoginView> {
                           );
                           if (signInResult.isSignedIn) {
                             // Fetch user attributes
-                            final attributes = await Amplify.Auth.fetchUserAttributes();
+                            final attributes =
+                                await Amplify.Auth.fetchUserAttributes();
                             for (final attr in attributes) {
                               if (attr.userAttributeKey.key == 'sub') {
                                 Session.userId = attr.value;
@@ -256,22 +272,33 @@ class _LoginViewState extends State<LoginView> {
                             }
                             await _loadHistory(Session.userId!);
 
-                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
                             if (mounted) {
-                              Navigator.pushReplacementNamed(this.context, '/dashboard');
+                              Navigator.pushReplacementNamed(
+                                this.context,
+                                '/dashboard',
+                              );
                             }
                             return;
                           } else {
-                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
                             setState(() {
-                              _message = 'Verification successful but auto-login failed. Please log in again.';
+                              _message =
+                                  'Verification successful but auto-login failed. Please log in again.';
                               _isError = true;
                             });
                           }
                         } on AuthException catch (e) {
-                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
                           setState(() {
-                            _message = 'Verification successful but login failed: ${e.message}';
+                            _message =
+                                'Verification successful but login failed: ${e.message}';
                             _isError = true;
                           });
                         }
@@ -306,7 +333,9 @@ class _LoginViewState extends State<LoginView> {
 
   /// Shows the initial forgot-password dialog asking for email.
   void _showForgotPasswordDialog() {
-    final emailForReset = TextEditingController(text: _emailController.text.trim());
+    final emailForReset = TextEditingController(
+      text: _emailController.text.trim(),
+    );
     String? dialogError;
     bool isDialogLoading = false;
 
@@ -316,8 +345,13 @@ class _LoginViewState extends State<LoginView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              title: const Text('Reset Password', style: TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: const Text(
+                'Reset Password',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,7 +380,10 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       child: Text(
                         dialogError!,
-                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -354,51 +391,69 @@ class _LoginViewState extends State<LoginView> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isDialogLoading ? null : () => Navigator.pop(dialogContext),
+                  onPressed: isDialogLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: isDialogLoading ? null : () async {
-                    final email = emailForReset.text.trim();
-                    if (email.isEmpty) {
-                      setDialogState(() {
-                        dialogError = 'Please enter your email.';
-                      });
-                      return;
-                    }
-                    setDialogState(() {
-                      isDialogLoading = true;
-                      dialogError = null;
-                    });
-                    try {
-                      final result = await Amplify.Auth.resetPassword(username: email);
-                      if (result.nextStep.updateStep == AuthResetPasswordStep.confirmResetPasswordWithCode) {
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                        _showConfirmResetDialog(email);
-                      } else {
-                        setDialogState(() {
-                          isDialogLoading = false;
-                          dialogError = 'Unexpected step: ${result.nextStep.updateStep}';
-                        });
-                      }
-                    } on AuthException catch (e) {
-                      setDialogState(() {
-                        isDialogLoading = false;
-                        dialogError = e.message;
-                      });
-                    } catch (e) {
-                      setDialogState(() {
-                        isDialogLoading = false;
-                        dialogError = e.toString();
-                      });
-                    }
-                  },
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          final email = emailForReset.text.trim();
+                          if (email.isEmpty) {
+                            setDialogState(() {
+                              dialogError = 'Please enter your email.';
+                            });
+                            return;
+                          }
+                          setDialogState(() {
+                            isDialogLoading = true;
+                            dialogError = null;
+                          });
+                          try {
+                            final result = await Amplify.Auth.resetPassword(
+                              username: email,
+                            );
+                            if (result.nextStep.updateStep ==
+                                AuthResetPasswordStep
+                                    .confirmResetPasswordWithCode) {
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                              _showConfirmResetDialog(email);
+                            } else {
+                              setDialogState(() {
+                                isDialogLoading = false;
+                                dialogError =
+                                    'Unexpected step: ${result.nextStep.updateStep}';
+                              });
+                            }
+                          } on AuthException catch (e) {
+                            setDialogState(() {
+                              isDialogLoading = false;
+                              dialogError = e.message;
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              isDialogLoading = false;
+                              dialogError = e.toString();
+                            });
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF9900),
                     foregroundColor: Colors.white,
                   ),
                   child: isDialogLoading
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text('Send Code'),
                 ),
               ],
@@ -423,8 +478,13 @@ class _LoginViewState extends State<LoginView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              title: const Text('Enter New Password', style: TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: const Text(
+                'Enter New Password',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,7 +500,10 @@ class _LoginViewState extends State<LoginView> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Verification code',
-                      prefixIcon: Icon(Icons.lock_clock_outlined, color: Colors.grey),
+                      prefixIcon: Icon(
+                        Icons.lock_clock_outlined,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -464,7 +527,10 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       child: Text(
                         dialogError!,
-                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -472,52 +538,66 @@ class _LoginViewState extends State<LoginView> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isDialogLoading ? null : () => Navigator.pop(dialogContext),
+                  onPressed: isDialogLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: isDialogLoading ? null : () async {
-                    final code = resetCodeController.text.trim();
-                    final newPassword = newPasswordController.text.trim();
-                    if (code.isEmpty || newPassword.isEmpty) {
-                      setDialogState(() {
-                        dialogError = 'Please fill in both fields.';
-                      });
-                      return;
-                    }
-                    setDialogState(() {
-                      isDialogLoading = true;
-                      dialogError = null;
-                    });
-                    try {
-                      await Amplify.Auth.confirmResetPassword(
-                        username: email,
-                        newPassword: newPassword,
-                        confirmationCode: code,
-                      );
-                      if (dialogContext.mounted) Navigator.pop(dialogContext);
-                      setState(() {
-                        _message = 'Password reset successful. Please log in with your new password.';
-                        _isError = false;
-                      });
-                    } on AuthException catch (e) {
-                      setDialogState(() {
-                        isDialogLoading = false;
-                        dialogError = e.message;
-                      });
-                    } catch (e) {
-                      setDialogState(() {
-                        isDialogLoading = false;
-                        dialogError = e.toString();
-                      });
-                    }
-                  },
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          final code = resetCodeController.text.trim();
+                          final newPassword = newPasswordController.text.trim();
+                          if (code.isEmpty || newPassword.isEmpty) {
+                            setDialogState(() {
+                              dialogError = 'Please fill in both fields.';
+                            });
+                            return;
+                          }
+                          setDialogState(() {
+                            isDialogLoading = true;
+                            dialogError = null;
+                          });
+                          try {
+                            await Amplify.Auth.confirmResetPassword(
+                              username: email,
+                              newPassword: newPassword,
+                              confirmationCode: code,
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            setState(() {
+                              _message =
+                                  'Password reset successful. Please log in with your new password.';
+                              _isError = false;
+                            });
+                          } on AuthException catch (e) {
+                            setDialogState(() {
+                              isDialogLoading = false;
+                              dialogError = e.message;
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              isDialogLoading = false;
+                              dialogError = e.toString();
+                            });
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF9900),
                     foregroundColor: Colors.white,
                   ),
                   child: isDialogLoading
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text('Reset Password'),
                 ),
               ],
@@ -540,7 +620,7 @@ class _LoginViewState extends State<LoginView> {
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -587,7 +667,10 @@ class _LoginViewState extends State<LoginView> {
                     TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.mail_outline, color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.mail_outline,
+                          color: Colors.grey,
+                        ),
                         hintText: 'name@company.com',
                         hintStyle: TextStyle(color: Colors.grey.shade400),
                       ),
@@ -609,7 +692,10 @@ class _LoginViewState extends State<LoginView> {
                       controller: _passwordController,
                       obscureText: true,
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: Colors.grey,
+                        ),
                         hintText: '••••••••',
                         hintStyle: TextStyle(color: Colors.grey.shade400),
                       ),
@@ -629,7 +715,12 @@ class _LoginViewState extends State<LoginView> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Expanded(child: _buildRoleCard('Warehouse / Seller', 'warehouse')),
+                        Expanded(
+                          child: _buildRoleCard(
+                            'Warehouse / Seller',
+                            'warehouse',
+                          ),
+                        ),
                         const SizedBox(width: 16),
                         Expanded(child: _buildRoleCard('Customer', 'customer')),
                       ],
@@ -644,14 +735,22 @@ class _LoginViewState extends State<LoginView> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: _isError ? Colors.red.shade50 : Colors.green.shade50,
+                          color: _isError
+                              ? Colors.red.shade50
+                              : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: _isError ? Colors.red.shade200 : Colors.green.shade200),
+                          border: Border.all(
+                            color: _isError
+                                ? Colors.red.shade200
+                                : Colors.green.shade200,
+                          ),
                         ),
                         child: Text(
                           _message!,
                           style: TextStyle(
-                            color: _isError ? Colors.red.shade700 : Colors.green.shade700,
+                            color: _isError
+                                ? Colors.red.shade700
+                                : Colors.green.shade700,
                             fontSize: 14,
                           ),
                         ),
@@ -662,33 +761,56 @@ class _LoginViewState extends State<LoginView> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: (_isSignUpLoading || _isLoginLoading) ? null : _signUp,
+                            onPressed: (_isSignUpLoading || _isLoginLoading)
+                                ? null
+                                : _signUp,
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 20),
                               side: BorderSide(color: Colors.grey.shade300),
                               foregroundColor: const Color(0xFF232F3E),
                             ),
                             child: _isSignUpLoading
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : const Text(
                                     'SIGN UP',
-                                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                    ),
                                   ),
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: (_isSignUpLoading || _isLoginLoading) ? null : _login,
+                            onPressed: (_isSignUpLoading || _isLoginLoading)
+                                ? null
+                                : _login,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 20),
                               elevation: 0,
                             ),
                             child: _isLoginLoading
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
                                 : const Text(
                                     'LOG IN',
-                                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                    ),
                                   ),
                           ),
                         ),
@@ -700,7 +822,9 @@ class _LoginViewState extends State<LoginView> {
                     Center(
                       child: TextButton(
                         onPressed: _showForgotPasswordDialog,
-                        style: TextButton.styleFrom(foregroundColor: const Color(0xFF232F3E)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF232F3E),
+                        ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -734,7 +858,9 @@ class _LoginViewState extends State<LoginView> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF9900).withOpacity(0.05) : Colors.grey.shade50,
+          color: isSelected
+              ? const Color(0xFFFF9900).withValues(alpha: 0.05)
+              : Colors.grey.shade50,
           border: Border.all(
             color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
@@ -744,8 +870,12 @@ class _LoginViewState extends State<LoginView> {
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade400,
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: isSelected
+                  ? const Color(0xFFFF9900)
+                  : Colors.grey.shade400,
               size: 20,
             ),
             const SizedBox(width: 8),

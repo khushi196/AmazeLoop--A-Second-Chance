@@ -7,7 +7,12 @@ class HealthCardView extends StatelessWidget {
   final Function(Widget)? onNavigate;
   final Function()? onFinishToHistory;
   final EvaluationInput? evaluation;
-  const HealthCardView({super.key, this.onNavigate, this.evaluation, this.onFinishToHistory});
+  const HealthCardView({
+    super.key,
+    this.onNavigate,
+    this.evaluation,
+    this.onFinishToHistory,
+  });
 
   /// Gets the hero photo URL using bestPhotoIndex, falling back to the first photo.
   String? _heroPhotoUrl(EvaluationInput? e) {
@@ -67,11 +72,20 @@ class HealthCardView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('AmazeLoop HealthCard',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F1111), letterSpacing: -0.5)),
+                const Text(
+                  'AmazeLoop HealthCard',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F1111),
+                    letterSpacing: -0.5,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text('Final summary for this product. Attach this card to guarantee authenticity and condition.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
+                Text(
+                  'Final summary for this product. Attach this card to guarantee authenticity and condition.',
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                ),
                 const SizedBox(height: 32),
 
                 // Passport card
@@ -80,11 +94,25 @@ class HealthCardView extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey.shade300, width: 2),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5))],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
-                      Container(height: 8, decoration: const BoxDecoration(color: Color(0xFFFF9900), borderRadius: BorderRadius.vertical(top: Radius.circular(10)))),
+                      Container(
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF9900),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(10),
+                          ),
+                        ),
+                      ),
 
                       // Hero photo
                       if (_heroPhotoUrl(e) != null)
@@ -105,21 +133,55 @@ class HealthCardView extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(color: const Color(0xFF00687A), borderRadius: BorderRadius.circular(4)),
-                                child: Text('${(e?.condition ?? 'N/A').toUpperCase()}',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              ),
-                              const SizedBox(width: 16),
-                              Text('ID: ${e?.evaluationId ?? '—'}', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ]),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00687A),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    (e?.condition ?? 'N/A').toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Text(
+                                  'ID: ${e?.evaluationId ?? '—'}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 24),
-                            Text(e?.productName ?? 'Graded Item',
-                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F1111))),
+                            Text(
+                              e?.productName ?? 'Graded Item',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F1111),
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            Text(e?.category ?? '', style: TextStyle(fontSize: 15, color: Colors.grey.shade600)),
+                            Text(
+                              e?.category ?? '',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
                             const SizedBox(height: 24),
                             const Divider(),
                             const SizedBox(height: 16),
@@ -127,14 +189,37 @@ class HealthCardView extends StatelessWidget {
                             // Key metrics
                             Row(
                               children: [
-                                Expanded(child: _metric('Condition', e?.condition ?? '—')),
-                                Expanded(child: _metric('Est. resale value', _money(e?.estimatedResaleValue ?? e?.normalizedPrice, currency))),
-                                Expanded(child: _metric('Disposition', disposition)),
+                                Expanded(
+                                  child: _metric(
+                                    'Condition',
+                                    e?.condition ?? '—',
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _metric(
+                                    'Est. resale value',
+                                    _money(
+                                      e?.estimatedResaleValue ??
+                                          e?.normalizedPrice,
+                                      currency,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _metric('Disposition', disposition),
+                                ),
                               ],
                             ),
                             if ((e?.conditionReason ?? '').isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              Text(e!.conditionReason!, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontStyle: FontStyle.italic)),
+                              Text(
+                                e!.conditionReason!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade700,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -156,30 +241,86 @@ class HealthCardView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(children: [
-                        const Icon(Icons.route, color: Color(0xFFFF9900)),
-                        const SizedBox(width: 8),
-                        Text('Final disposition: $disposition',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F1111))),
-                        const SizedBox(width: 12),
-                        if (isOverride)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(4)),
-                            child: Text('OVERRIDDEN', style: TextStyle(color: Colors.amber.shade900, fontSize: 10, fontWeight: FontWeight.bold)),
+                      Row(
+                        children: [
+                          const Icon(Icons.route, color: Color(0xFFFF9900)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Final disposition: $disposition',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F1111),
+                            ),
                           ),
-                      ]),
+                          const SizedBox(width: 12),
+                          if (isOverride)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'OVERRIDDEN',
+                                style: TextStyle(
+                                  color: Colors.amber.shade900,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 16),
-                      const Text('Next steps', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F1111), letterSpacing: 0.5)),
+                      const Text(
+                        'Next steps',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F1111),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      ..._nextSteps(disposition, e?.nearestWarehouseId).asMap().entries.map((entry) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              CircleAvatar(radius: 10, backgroundColor: const Color(0xFFFF9900), child: Text('${entry.key + 1}', style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold))),
+                      ..._nextSteps(
+                        disposition,
+                        e?.nearestWarehouseId,
+                      ).asMap().entries.map(
+                        (entry) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                radius: 10,
+                                backgroundColor: const Color(0xFFFF9900),
+                                child: Text(
+                                  '${entry.key + 1}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                               const SizedBox(width: 12),
-                              Expanded(child: Text(entry.value, style: const TextStyle(fontSize: 14, color: Color(0xFF0F1111)))),
-                            ]),
-                          )),
+                              Expanded(
+                                child: Text(
+                                  entry.value,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF0F1111),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -196,13 +337,29 @@ class HealthCardView extends StatelessWidget {
                                 await ReportGenerator.downloadReport(e);
                               } catch (err) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not generate report: $err')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Could not generate report: $err',
+                                      ),
+                                    ),
+                                  );
                                 }
                               }
                             },
                       icon: const Icon(Icons.download),
-                      label: const Text('DOWNLOAD REPORT', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20), foregroundColor: const Color(0xFF0F1111), side: BorderSide(color: Colors.grey.shade300, width: 2)),
+                      label: const Text(
+                        'DOWNLOAD REPORT',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 20,
+                        ),
+                        foregroundColor: const Color(0xFF0F1111),
+                        side: BorderSide(color: Colors.grey.shade300, width: 2),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
@@ -214,8 +371,18 @@ class HealthCardView extends StatelessWidget {
                         }
                       },
                       icon: const Icon(Icons.check_circle),
-                      label: const Text('CONFIRM & ROUTE', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20), backgroundColor: const Color(0xFFFF9900), foregroundColor: Colors.white),
+                      label: const Text(
+                        'CONFIRM & ROUTE',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 20,
+                        ),
+                        backgroundColor: const Color(0xFFFF9900),
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -231,9 +398,23 @@ class HealthCardView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F1111))),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F1111),
+          ),
+        ),
       ],
     );
   }

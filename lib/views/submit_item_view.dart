@@ -15,7 +15,7 @@ class SubmitItemView extends StatefulWidget {
 
 class _SubmitItemViewState extends State<SubmitItemView> {
   final ImagePicker _picker = ImagePicker();
-  List<XFile> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
 
   final GradeRepository _gradeRepository = GradeRepository();
   final TextEditingController _productNameController = TextEditingController();
@@ -48,7 +48,9 @@ class _SubmitItemViewState extends State<SubmitItemView> {
 
   Future<void> _gradeItem() async {
     if (_selectedImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload at least one photo!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload at least one photo!')),
+      );
       return;
     }
     if (_productNameController.text.trim().isEmpty ||
@@ -56,7 +58,11 @@ class _SubmitItemViewState extends State<SubmitItemView> {
         _selectedReason == null ||
         _orderOrPriceController.text.trim().isEmpty ||
         _pincodeController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all item details including pincode.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all item details including pincode.'),
+        ),
+      );
       return;
     }
 
@@ -106,7 +112,13 @@ class _SubmitItemViewState extends State<SubmitItemView> {
       setState(() => _isGrading = false);
 
       if (widget.onNavigate != null) {
-        widget.onNavigate!(GradingResultView(onNavigate: widget.onNavigate, evaluation: result, onFinishToHistory: widget.onFinishToHistory));
+        widget.onNavigate!(
+          GradingResultView(
+            onNavigate: widget.onNavigate,
+            evaluation: result,
+            onFinishToHistory: widget.onFinishToHistory,
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -131,9 +143,20 @@ class _SubmitItemViewState extends State<SubmitItemView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Give this product a second life', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F1111), letterSpacing: -0.5)),
+                const Text(
+                  'Give this product a second life',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F1111),
+                    letterSpacing: -0.5,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text('Enter the product details and upload condition photos to generate an accurate AI-driven grading assessment.', style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
+                Text(
+                  'Enter the product details and upload condition photos to generate an accurate AI-driven grading assessment.',
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                ),
                 const SizedBox(height: 32),
 
                 Row(
@@ -147,17 +170,35 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                 const SizedBox(height: 32),
                 const Divider(),
                 const SizedBox(height: 24),
-                
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     ElevatedButton.icon(
                       onPressed: _isGrading ? null : _gradeItem,
                       icon: _isGrading
-                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Icon(Icons.auto_awesome),
-                      label: Text(_isGrading ? 'GRADING...' : 'GRADE ITEM', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+                      label: Text(
+                        _isGrading ? 'GRADING...' : 'GRADE ITEM',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 20,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -172,42 +213,157 @@ class _SubmitItemViewState extends State<SubmitItemView> {
   Widget _buildItemDetailsCard() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(children: [Icon(Icons.info_outline, color: Color(0xFF0F1111)), SizedBox(width: 8), Text('Item Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F1111)))]),
-          const SizedBox(height: 16), const Divider(), const SizedBox(height: 16),
+          const Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFF0F1111)),
+              SizedBox(width: 8),
+              Text(
+                'Item Details',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F1111),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
           _buildLabel('PRODUCT NAME'),
-          TextField(controller: _productNameController, decoration: const InputDecoration(hintText: 'e.g., Apple iPad Pro 11-inch (3rd Gen)')),
+          TextField(
+            controller: _productNameController,
+            decoration: const InputDecoration(
+              hintText: 'e.g., Apple iPad Pro 11-inch (3rd Gen)',
+            ),
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('CATEGORY'), DropdownButtonFormField<String>(isExpanded: true, value: _selectedCategory, items: const [
-                DropdownMenuItem(value: 'Electronics & Computers', child: Text('Electronics & Computers')),
-                DropdownMenuItem(value: 'Home & Kitchen', child: Text('Home & Kitchen')),
-                DropdownMenuItem(value: 'Beauty & Personal Care', child: Text('Beauty & Personal Care')),
-                DropdownMenuItem(value: 'Clothing, Shoes & Jewelry', child: Text('Clothing, Shoes & Jewelry')),
-                DropdownMenuItem(value: 'Health, Household & Baby Care', child: Text('Health, Household & Baby Care')),
-                DropdownMenuItem(value: 'Books, Music, Movies & Video Games', child: Text('Books, Music, Movies & Video Games')),
-                DropdownMenuItem(value: 'Toys, Kids & Baby', child: Text('Toys, Kids & Baby')),
-                DropdownMenuItem(value: 'Sports, Outdoors & Fitness', child: Text('Sports, Outdoors & Fitness')),
-                DropdownMenuItem(value: 'Automotive, Tools & Industrial', child: Text('Automotive, Tools & Industrial')),
-                DropdownMenuItem(value: 'Grocery', child: Text('Grocery')),
-              ], onChanged: (val) => setState(() => _selectedCategory = val), hint: const Text('Select...'))])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('CATEGORY'),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: _selectedCategory,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Electronics & Computers',
+                          child: Text('Electronics & Computers'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Home & Kitchen',
+                          child: Text('Home & Kitchen'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Beauty & Personal Care',
+                          child: Text('Beauty & Personal Care'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Clothing, Shoes & Jewelry',
+                          child: Text('Clothing, Shoes & Jewelry'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Health, Household & Baby Care',
+                          child: Text('Health, Household & Baby Care'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Books, Music, Movies & Video Games',
+                          child: Text('Books, Music, Movies & Video Games'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Toys, Kids & Baby',
+                          child: Text('Toys, Kids & Baby'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Sports, Outdoors & Fitness',
+                          child: Text('Sports, Outdoors & Fitness'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Automotive, Tools & Industrial',
+                          child: Text('Automotive, Tools & Industrial'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Grocery',
+                          child: Text('Grocery'),
+                        ),
+                      ],
+                      onChanged: (val) =>
+                          setState(() => _selectedCategory = val),
+                      hint: const Text('Select...'),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('REASON FOR RETURN'), DropdownButtonFormField<String>(isExpanded: true, value: _selectedReason, items: const [
-                DropdownMenuItem(value: 'Returned Amazon order', child: Text('Returned Amazon order')),
-                DropdownMenuItem(value: 'Unused at home', child: Text('Unused at home')),
-              ], onChanged: (val) => setState(() => _selectedReason = val), hint: const Text('Select...'))])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('REASON FOR RETURN'),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: _selectedReason,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Returned Amazon order',
+                          child: Text('Returned Amazon order'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Unused at home',
+                          child: Text('Unused at home'),
+                        ),
+                      ],
+                      onChanged: (val) => setState(() => _selectedReason = val),
+                      hint: const Text('Select...'),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('ORDER ID / COST (₹)'), TextField(controller: _orderOrPriceController, decoration: const InputDecoration(hintText: 'e.g., ORD-101 or 2999'))])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('ORDER ID / COST (₹)'),
+                    TextField(
+                      controller: _orderOrPriceController,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g., ORD-101 or 2999',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('PINCODE / LOCATION'), TextField(controller: _pincodeController, decoration: const InputDecoration(hintText: 'e.g., 560001'))])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('PINCODE / LOCATION'),
+                    TextField(
+                      controller: _pincodeController,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g., 560001',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -218,36 +374,164 @@ class _SubmitItemViewState extends State<SubmitItemView> {
   Widget _buildConditionPhotosCard() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Row(children: [Icon(Icons.photo_camera_outlined, color: Color(0xFF0F1111)), SizedBox(width: 8), Text('Condition Photos', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F1111)))]), Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.grey.shade300)), child: const Text('Required', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))]),
-          const SizedBox(height: 16), const Divider(), const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.photo_camera_outlined, color: Color(0xFF0F1111)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Condition Photos',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F1111),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Text(
+                  'Required',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
           InkWell(
             onTap: _pickImages,
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 48),
-              decoration: BoxDecoration(color: _selectedImages.isNotEmpty ? const Color(0xFFFF9900).withOpacity(0.05) : const Color(0xFFF9F9F9), border: Border.all(color: _selectedImages.isNotEmpty ? const Color(0xFFFF9900) : Colors.grey.shade400, width: 2), borderRadius: BorderRadius.circular(8)),
-              child: Column(children: [CircleAvatar(radius: 24, backgroundColor: _selectedImages.isNotEmpty ? const Color(0xFFFF9900) : Colors.grey.shade200, child: Icon(_selectedImages.isNotEmpty ? Icons.check : Icons.upload, color: _selectedImages.isNotEmpty ? Colors.white : const Color(0xFF0F1111))), const SizedBox(height: 16), Text(_selectedImages.isNotEmpty ? '${_selectedImages.length} Photo(s) Attached' : 'Click to upload high-res photos', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), const SizedBox(height: 4), Text(_selectedImages.isNotEmpty ? 'Click again to add more' : 'Supports JPG, PNG', style: TextStyle(color: Colors.grey.shade600, fontSize: 14))]),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              decoration: BoxDecoration(
+                color: _selectedImages.isNotEmpty
+                    ? const Color(0xFFFF9900).withValues(alpha: 0.05)
+                    : const Color(0xFFF9F9F9),
+                border: Border.all(
+                  color: _selectedImages.isNotEmpty
+                      ? const Color(0xFFFF9900)
+                      : Colors.grey.shade400,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: _selectedImages.isNotEmpty
+                        ? const Color(0xFFFF9900)
+                        : Colors.grey.shade200,
+                    child: Icon(
+                      _selectedImages.isNotEmpty ? Icons.check : Icons.upload,
+                      color: _selectedImages.isNotEmpty
+                          ? Colors.white
+                          : const Color(0xFF0F1111),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _selectedImages.isNotEmpty
+                        ? '${_selectedImages.length} Photo(s) Attached'
+                        : 'Click to upload high-res photos',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _selectedImages.isNotEmpty
+                        ? 'Click again to add more'
+                        : 'Supports JPG, PNG',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
-          Row(children: [Expanded(child: _buildThumbnail('Front', 0)), const SizedBox(width: 16), Expanded(child: _buildThumbnail('Side', 1)), const SizedBox(width: 16), Expanded(child: _buildThumbnail('Back', 2))])
+          Row(
+            children: [
+              Expanded(child: _buildThumbnail('Front', 0)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildThumbnail('Side', 1)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildThumbnail('Back', 2)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLabel(String text) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade800, letterSpacing: 1.0)));
+  Widget _buildLabel(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade800,
+        letterSpacing: 1.0,
+      ),
+    ),
+  );
 
   Widget _buildThumbnail(String label, int index) {
     final bool hasImage = _selectedImages.length > index;
     return Column(
       children: [
-        AspectRatio(aspectRatio: 1, child: Container(decoration: BoxDecoration(color: hasImage ? const Color(0xFFFF9900).withOpacity(0.1) : Colors.white, border: Border.all(color: hasImage ? const Color(0xFFFF9900) : Colors.grey.shade300), borderRadius: BorderRadius.circular(4)), child: Center(child: Icon(hasImage ? Icons.image : Icons.add_photo_alternate_outlined, color: hasImage ? const Color(0xFFFF9900) : Colors.grey)))),
-        const SizedBox(height: 8), Text(hasImage ? "ATTACHED" : label.toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: hasImage ? const Color(0xFFFF9900) : Colors.black)),
+        AspectRatio(
+          aspectRatio: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              color: hasImage
+                  ? const Color(0xFFFF9900).withValues(alpha: 0.1)
+                  : Colors.white,
+              border: Border.all(
+                color: hasImage
+                    ? const Color(0xFFFF9900)
+                    : Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Center(
+              child: Icon(
+                hasImage ? Icons.image : Icons.add_photo_alternate_outlined,
+                color: hasImage ? const Color(0xFFFF9900) : Colors.grey,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          hasImage ? "ATTACHED" : label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: hasImage ? const Color(0xFFFF9900) : Colors.black,
+          ),
+        ),
       ],
     );
   }
