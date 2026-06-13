@@ -20,6 +20,14 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     });
   }
 
+  // Navigates back to the History tab and clears any custom view
+  void _goToHistory() {
+    setState(() {
+      _selectedIndex = 1;
+      _currentCustomView = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Determine what to show in the main area
@@ -28,8 +36,8 @@ class _DashboardLayoutState extends State<DashboardLayout> {
       mainContent = _currentCustomView!;
     } else {
       mainContent = _selectedIndex == 0 
-          ? SubmitItemView(onNavigate: _changeView) 
-          : const HistoryView();
+          ? SubmitItemView(onNavigate: _changeView, onFinishToHistory: _goToHistory) 
+          : HistoryView(onNavigate: _changeView);
     }
 
     return Scaffold(

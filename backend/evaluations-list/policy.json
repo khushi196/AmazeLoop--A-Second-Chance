@@ -1,0 +1,1 @@
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["dynamodb:Query","dynamodb:Scan"],"Resource":["arn:aws:dynamodb:ap-south-1:191918535218:table/Evaluations","arn:aws:dynamodb:ap-south-1:191918535218:table/Evaluations/index/*"]}]}

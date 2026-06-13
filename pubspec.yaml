@@ -40,6 +40,13 @@ dependencies:
   amplify_flutter: ^2.7.0
   amplify_auth_cognito: ^2.7.0
 
+  # Networking
+  http: ^1.2.0
+
+  # PDF report generation + download
+  pdf: ^3.11.0
+  printing: ^5.13.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

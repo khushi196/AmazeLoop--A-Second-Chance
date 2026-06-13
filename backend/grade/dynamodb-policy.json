@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadProductsCatalog",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:ap-south-1:191918535218:table/ProductsCatalog",
+        "arn:aws:dynamodb:ap-south-1:191918535218:table/ProductsCatalog/index/*"
+      ]
+    },
+    {
+      "Sid": "WriteEvaluations",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-south-1:191918535218:table/Evaluations"
+    }
+  ]
+}

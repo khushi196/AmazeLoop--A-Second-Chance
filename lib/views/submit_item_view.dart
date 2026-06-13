@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../data/models/evaluation_input.dart';
+import '../data/repositories/grade_repository.dart';
 import 'grading_result_view.dart';
 
 class SubmitItemView extends StatefulWidget {
   final Function(Widget)? onNavigate;
-  const SubmitItemView({super.key, this.onNavigate});
+  final Function()? onFinishToHistory;
+  const SubmitItemView({super.key, this.onNavigate, this.onFinishToHistory});
 
   @override
   State<SubmitItemView> createState() => _SubmitItemViewState();
@@ -13,6 +16,22 @@ class SubmitItemView extends StatefulWidget {
 class _SubmitItemViewState extends State<SubmitItemView> {
   final ImagePicker _picker = ImagePicker();
   List<XFile> _selectedImages = [];
+
+  final GradeRepository _gradeRepository = GradeRepository();
+  final TextEditingController _productNameController = TextEditingController();
+  final TextEditingController _orderOrPriceController = TextEditingController();
+  final TextEditingController _pincodeController = TextEditingController();
+  String? _selectedCategory;
+  String? _selectedReason;
+  bool _isGrading = false;
+
+  @override
+  void dispose() {
+    _productNameController.dispose();
+    _orderOrPriceController.dispose();
+    _pincodeController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImages() async {
     try {
@@ -24,6 +43,74 @@ class _SubmitItemViewState extends State<SubmitItemView> {
       }
     } catch (e) {
       debugPrint("Error picking images: $e");
+    }
+  }
+
+  Future<void> _gradeItem() async {
+    if (_selectedImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload at least one photo!')));
+      return;
+    }
+    if (_productNameController.text.trim().isEmpty ||
+        _selectedCategory == null ||
+        _selectedReason == null ||
+        _orderOrPriceController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all item details.')));
+      return;
+    }
+
+    setState(() => _isGrading = true);
+
+    try {
+      // 1. Upload all selected photos to S3 and collect their URLs
+      final List<String> photoUrls = [];
+      for (int i = 0; i < _selectedImages.length; i++) {
+        final image = _selectedImages[i];
+        final bytes = await image.readAsBytes();
+        final url = await _gradeRepository.uploadPhoto(
+          bytes: bytes,
+          fileName: image.name.isNotEmpty ? image.name : 'photo_$i.jpg',
+          contentType: 'image/jpeg',
+        );
+        photoUrls.add(url);
+      }
+
+      // 2. Submit for price/order grading -> creates the Evaluation record
+      final EvaluationInput result = await _gradeRepository.gradeItem(
+        productName: _productNameController.text.trim(),
+        category: _selectedCategory!,
+        reason: _selectedReason!,
+        orderOrPrice: _orderOrPriceController.text.trim(),
+        currentPincode: _pincodeController.text.trim(),
+        photoUrls: photoUrls,
+      );
+
+      // 3. Run AI vision grading (Rekognition) on the uploaded photos
+      if (result.evaluationId != null) {
+        try {
+          final ai = await _gradeRepository.aiGrade(result.evaluationId!);
+          result.condition = ai.condition;
+          result.conditionReason = ai.conditionReason;
+          result.estimatedResaleValue = ai.estimatedResaleValue;
+        } catch (e) {
+          // AI grading is best-effort; proceed with price data if it fails.
+          debugPrint('AI grading failed: $e');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _isGrading = false);
+
+      if (widget.onNavigate != null) {
+        widget.onNavigate!(GradingResultView(onNavigate: widget.onNavigate, evaluation: result, onFinishToHistory: widget.onFinishToHistory));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isGrading = false);
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+      );
     }
   }
 
@@ -61,42 +148,11 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () async {
-                        if (_selectedImages.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload at least one photo!')));
-                          return;
-                        }
-                        
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => const Center(
-                            child: Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(32.0),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    CircularProgressIndicator(color: Color(0xFFFF9900)),
-                                    SizedBox(height: 16),
-                                    Text("Running AWS Vision AI...", style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-
-                        await Future.delayed(const Duration(seconds: 2));
-                        if (context.mounted) Navigator.pop(context);
-
-                        // MAGIC ROUTING HAPPENS HERE
-                        if (widget.onNavigate != null) {
-                          widget.onNavigate!(GradingResultView(onNavigate: widget.onNavigate));
-                        }
-                      },
-                      icon: const Icon(Icons.auto_awesome),
-                      label: const Text('GRADE ITEM', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      onPressed: _isGrading ? null : _gradeItem,
+                      icon: _isGrading
+                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.auto_awesome),
+                      label: Text(_isGrading ? 'GRADING...' : 'GRADE ITEM', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                       style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
                     ),
                   ],
@@ -119,21 +175,35 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           const Row(children: [Icon(Icons.info_outline, color: Color(0xFF0F1111)), SizedBox(width: 8), Text('Item Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F1111)))]),
           const SizedBox(height: 16), const Divider(), const SizedBox(height: 16),
           _buildLabel('PRODUCT NAME'),
-          const TextField(decoration: InputDecoration(hintText: 'e.g., Apple iPad Pro 11-inch (3rd Gen)')),
+          TextField(controller: _productNameController, decoration: const InputDecoration(hintText: 'e.g., Apple iPad Pro 11-inch (3rd Gen)')),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('CATEGORY'), DropdownButtonFormField<String>(isExpanded: true, items: const [DropdownMenuItem(value: 'electronics', child: Text('Electronics'))], onChanged: (val) {}, hint: const Text('Select...'))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('CATEGORY'), DropdownButtonFormField<String>(isExpanded: true, value: _selectedCategory, items: const [
+                DropdownMenuItem(value: 'Electronics & Computers', child: Text('Electronics & Computers')),
+                DropdownMenuItem(value: 'Home & Kitchen', child: Text('Home & Kitchen')),
+                DropdownMenuItem(value: 'Beauty & Personal Care', child: Text('Beauty & Personal Care')),
+                DropdownMenuItem(value: 'Clothing, Shoes & Jewelry', child: Text('Clothing, Shoes & Jewelry')),
+                DropdownMenuItem(value: 'Health, Household & Baby Care', child: Text('Health, Household & Baby Care')),
+                DropdownMenuItem(value: 'Books, Music, Movies & Video Games', child: Text('Books, Music, Movies & Video Games')),
+                DropdownMenuItem(value: 'Toys, Kids & Baby', child: Text('Toys, Kids & Baby')),
+                DropdownMenuItem(value: 'Sports, Outdoors & Fitness', child: Text('Sports, Outdoors & Fitness')),
+                DropdownMenuItem(value: 'Automotive, Tools & Industrial', child: Text('Automotive, Tools & Industrial')),
+                DropdownMenuItem(value: 'Grocery', child: Text('Grocery')),
+              ], onChanged: (val) => setState(() => _selectedCategory = val), hint: const Text('Select...'))])),
               const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('REASON FOR RETURN'), DropdownButtonFormField<String>(isExpanded: true, items: const [DropdownMenuItem(value: 'return', child: Text('Returned order'))], onChanged: (val) {}, hint: const Text('Select...'))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('REASON FOR RETURN'), DropdownButtonFormField<String>(isExpanded: true, value: _selectedReason, items: const [
+                DropdownMenuItem(value: 'Returned Amazon order', child: Text('Returned Amazon order')),
+                DropdownMenuItem(value: 'Unused at home', child: Text('Unused at home')),
+              ], onChanged: (val) => setState(() => _selectedReason = val), hint: const Text('Select...'))])),
             ],
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('ORDER ID / COST (₹)'), const TextField(decoration: InputDecoration(hintText: 'e.g., 403-1234567'))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('ORDER ID / COST (₹)'), TextField(controller: _orderOrPriceController, decoration: const InputDecoration(hintText: 'e.g., ORD-101 or 2999'))])),
               const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('PINCODE / LOCATION'), const TextField(decoration: InputDecoration(hintText: 'e.g., 560001'))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel('PINCODE / LOCATION'), TextField(controller: _pincodeController, decoration: const InputDecoration(hintText: 'e.g., 560001'))])),
             ],
           ),
         ],
