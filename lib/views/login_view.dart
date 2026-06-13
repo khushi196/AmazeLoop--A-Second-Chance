@@ -78,7 +78,7 @@ class _LoginViewState extends State<LoginView> {
     });
 
     try {
-      await Amplify.Auth.signUp(
+      final result = await Amplify.Auth.signUp(
         username: email,
         password: password,
         options: SignUpOptions(
@@ -88,6 +88,20 @@ class _LoginViewState extends State<LoginView> {
           },
         ),
       );
+
+      if (!result.isSignUpComplete &&
+          result.nextStep.signUpStep == AuthSignUpStep.confirmSignUp) {
+        // Cognito already sent a verification code as part of signUp.
+        // Show the dialog immediately and reuse THAT code — do not trigger
+        // another send (that was the cause of two codes arriving).
+        setState(() {
+          _isSignUpLoading = false;
+          _message = null;
+        });
+        if (mounted) _showVerificationDialog(email);
+        return;
+      }
+
       setState(() {
         _message = 'Account created. Please log in.';
         _isError = false;
@@ -148,8 +162,10 @@ class _LoginViewState extends State<LoginView> {
           _routeByRole();
         }
       } else if (result.nextStep.signInStep == AuthSignInStep.confirmSignUp) {
-        // User exists but hasn't confirmed their email yet — trigger verification flow
-        await Amplify.Auth.resendSignUpCode(username: email);
+        // User exists but hasn't confirmed their email yet. Open the
+        // verification dialog WITHOUT auto-resending — a code was already
+        // sent at sign-up. The dialog has a "Resend code" button for when
+        // the original has expired, so we don't waste a second email.
         setState(() {
           _isLoginLoading = false;
         });
@@ -324,6 +340,26 @@ class _LoginViewState extends State<LoginView> {
                 ],
               ),
               actions: [
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await Amplify.Auth.resendSignUpCode(username: email);
+                      setDialogState(() {
+                        dialogError = null;
+                      });
+                      if (dialogContext.mounted) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(content: Text('A new code has been sent.')),
+                        );
+                      }
+                    } on AuthException catch (e) {
+                      setDialogState(() {
+                        dialogError = e.message;
+                      });
+                    }
+                  },
+                  child: const Text('Resend code'),
+                ),
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),

@@ -64,3 +64,8 @@ backend/**/permissions-policy.json
 backend/**/dynamodb-policy.json
 backend/**/s3-policy.json
 backend/**/policy.json
+
+# Prompt evaluation harness — local-only artifacts
+scripts/prompt-eval/node_modules/
+scripts/prompt-eval/package-lock.json
+scripts/prompt-eval/results.json

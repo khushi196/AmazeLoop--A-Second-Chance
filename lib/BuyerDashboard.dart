@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'MarketplaceTab.dart';
+import 'ReservedTab.dart';
 import 'PurchasesTab.dart';
+import 'NotificationsTab.dart';
 
-/// Top-level shell for buyers and guest browsers. Two tabs only —
-/// the Sell / Trade-in flow lives behind the entry screen, not in this
-/// dashboard.
+/// Top-level shell for buyers and guest browsers. The Sell / Trade-in flow
+/// lives behind the entry screen, not in this dashboard.
 class BuyerDashboard extends StatefulWidget {
   const BuyerDashboard({Key? key}) : super(key: key);
 
@@ -15,12 +16,18 @@ class BuyerDashboard extends StatefulWidget {
 
 class _BuyerDashboardState extends State<BuyerDashboard> {
   int _currentIndex = 0;
+  final GlobalKey<ReservedTabState> _reservedKey =
+      GlobalKey<ReservedTabState>();
   final GlobalKey<PurchasesTabState> _purchasesKey =
       GlobalKey<PurchasesTabState>();
+  final GlobalKey<NotificationsTabState> _notificationsKey =
+      GlobalKey<NotificationsTabState>();
 
   late final List<Widget> _views = [
     const MarketplaceTab(),
+    ReservedTab(key: _reservedKey),
     PurchasesTab(key: _purchasesKey),
+    NotificationsTab(key: _notificationsKey),
   ];
 
   @override
@@ -65,9 +72,19 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                   index: 0,
                 ),
                 _buildNavItem(
+                  icon: Icons.bookmark_outline,
+                  title: 'Reserved',
+                  index: 1,
+                ),
+                _buildNavItem(
                   icon: Icons.shopping_bag_outlined,
                   title: 'My Purchases',
-                  index: 1,
+                  index: 2,
+                ),
+                _buildNavItem(
+                  icon: Icons.notifications_none,
+                  title: 'Notifications',
+                  index: 3,
                 ),
 
                 const Spacer(),
@@ -116,10 +133,18 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
         setState(() {
           _currentIndex = index;
         });
-        // Refresh purchases whenever the user opens that tab so a freshly
-        // reserved item appears without a manual pull-to-refresh.
-        if (index == 1) {
-          _purchasesKey.currentState?.reload();
+        // Refresh the relevant tab when opened so newly reserved/bought items
+        // and fresh notifications appear without a manual pull-to-refresh.
+        switch (index) {
+          case 1:
+            _reservedKey.currentState?.reload();
+            break;
+          case 2:
+            _purchasesKey.currentState?.reload();
+            break;
+          case 3:
+            _notificationsKey.currentState?.reload();
+            break;
         }
       },
       child: Container(

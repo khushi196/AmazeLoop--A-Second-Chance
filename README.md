@@ -1,122 +1,531 @@
-AmazeLoop: Technical Architecture Document
-Platform Classification: Consumer-to-Business (C2B) Trade-In & Recommerce
-Version: 1.0 | Environment: AWS ap-south-1 (Mumbai)
+# AmazeLoop — A Second Chance
 
-1. Project Overview
-AmazeLoop is a dual-stream recommerce platform designed to give used products a structured second life. It operates across two distinct input channels: Amazon returns (logistics-optimization stream) and consumer trade-ins of unused household goods. Upon item submission, the platform performs automated condition grading using computer vision, normalizes the item's fair market value against a catalog of reference products, and routes the item to the most economically optimal disposition — Resell, Refurbish, or Recycle.
+> A dual-stream recommerce platform that gives used products a structured second life.
+> Items are photographed, **AI-graded** for condition, fairly priced, and routed to the most
+> economical outcome — **Resell, Refurbish, or Recycle** — then sold on a trust-first marketplace.
 
-The system is built as a serverless, event-driven architecture on AWS, with a Flutter-based web/mobile frontend and a pipeline of independent Lambda microservices communicating through Amazon DynamoDB as the shared state store.
-
-2. Core Architecture: Four-Tier Flow
-graph TD
-    User[Flutter Web Dashboard] -->|HTTPS| API[API Gateway]
-    API --> Grade[Grade Function]
-    API --> AI[AI Grade Function]
-    API --> Route[Route Function]
-    
-    Grade --> Dynamo[(DynamoDB)]
-    AI --> S3[(S3 Photos)]
-    AI --> Bedrock[Amazon Bedrock]
-    Route --> Dynamo
-    
-    style AI fill:#f96,stroke:#333
-    style Grade fill:#69f,stroke:#333
-   
-4. Data Management: Identity-Bound Strategy
-All evaluation records are partitioned by Cognito User Identity (userId = sub claim) rather than by warehouse zone, product category, or submission date. This design decision has three consequences:
-
-Partition strategy:
-
-DynamoDB: Evaluations
-  Partition key:  evaluationId  (EVAL-<uuid>)
-  GSI-1:          userId-createdAt-index
-                  → enables O(log n) per-user history queries
-                  → sorted by createdAt DESC (newest first)
-  GSI-2:          userId-createdAt-index (same GSI)
-                  → warehouse view uses nearestWarehouseId scan
-                    (planned GSI upgrade)
-Catalog partitioning:
-
-DynamoDB: ProductsCatalog
-  Partition key:  productId
-  GSI:            orderId-index
-                  → O(1) catalog lookup by order ID
-                  → eliminates full-table scan for order-ID path
-Privacy boundary: A user's evaluation history is never accessible to another user. The history endpoint derives userId from Cognito authorizer claims when available, falling back to the query parameter only when no authorizer is configured — ensuring the identity boundary is enforced at the infrastructure level once an authorizer is attached.
-
-4. Key Achievements
-End-to-end AI grading workflow. The platform successfully chains five independent Lambda functions (upload-url → grade → ai-grade → route → route-confirm) with DynamoDB as the shared state store. Each step is independently retryable and stateless. The vision grading pipeline uses Amazon Bedrock (Nova Lite) with a structured JSON output contract and hard-coded rules to prevent the model from under-penalizing visibly damaged items.
-
-Dual-stream sorting logic. The Smart Gateway automatically classifies each submission into one of two queues based on the reason field: LOGISTICS_OPTIMIZATION_QUEUE (Amazon returns, priority HIGH) and CONSUMER_TRADE_IN_QUEUE (unused items, priority NORMAL). This drives different routing rules downstream — returned Amazon orders are prioritized for direct resale on Amazon Renewed, while consumer trade-ins are evaluated for local marketplace or recycling pathways.
-
-LLM-assisted price normalization. When the ProductsCatalog has no comparable items in the user's price tier, the system falls back to a vision-augmented LLM call — passing both the product photo and catalog samples as context — to estimate a fair like-new reference price. This prevents unchecked user-entered prices from inflating or distorting the AI's resale value calculation.
-
-Role-based data isolation. Cognito user attributes store a custom:role (warehouse / customer) at sign-up. The session is held in-memory post-login and sent with every grading request, enabling the backend to annotate evaluations with userRole for downstream warehouse-filtering views.
-
-5. Technology Stack
-Layer	Technology	Purpose
-Authentication	AWS Amplify + Amazon Cognito	Email/password auth, role attributes, session management
-Frontend	Flutter (Web + Mobile)	Cross-platform dashboard, form submission, HealthCard
-API Gateway	Amazon API Gateway (HTTP API)	CORS-enabled routing to Lambda functions
-Compute	AWS Lambda (Node.js 20)	Stateless microservices for each pipeline stage
-Object Storage	Amazon S3	Photo storage via presigned PUT URLs
-Vision AI	Amazon Bedrock — Amazon Nova Lite	Product condition grading from photos
-Price Intelligence	Amazon Bedrock — Amazon Nova Lite	LLM-based price estimation when catalog is sparse
-Database	Amazon DynamoDB	Evaluations store + ProductsCatalog with GSIs
-PDF Generation	Flutter pdf + printing packages	HealthCard report download
-Routing Logic	Custom Haversine + rule engine (Lambda)	Nearest warehouse + disposition matrix
-CI/CD	Git (local commits, GitHub push)	Version control
-Note on Lambda runtime: All Lambda functions in this implementation use Node.js 20 (ESM modules). The prompt specification listed Python — the implementation choice was Node.js for consistency with the AWS SDK v3 ESM patterns and the inline vision model integration.
-
-### AmazeLoop Grade Item Pipeline
-
-| Stage | Action | Backend Component | Key Logic |
-| :--- | :--- | :--- | :--- |
-| **1. Ingestion** | Upload Photos | `AmazeLoopUploadUrl` | Presigned S3 PUT URLs |
-| **2. Gateway** | Validate & Save | `AmazeLoopGrade` | Catalog lookup or Price normalization |
-| **3. Inference** | AI Grading | `AmazeLoopAiGrade` | Rekognition Labels → Rule-based Scoring |
-| **4. Routing** | Final Disposition | `AmazeLoopRoute` | Distance calculation & Queue sorting |
+**Environment:** AWS `ap-south-1` (Mumbai) · **Frontend:** Flutter (Web) · **Backend:** Serverless (Lambda + API Gateway + DynamoDB + S3 + Bedrock + Cognito)
 
 ---
 
-### Execution Details
-<details>
-<summary>Click to view technical specs</summary>
+## Table of contents
 
-| Step | Data Output | Disposition Trigger |
+1. [The problem and our approach](#1-the-problem-and-our-approach)
+2. [High-level architecture](#2-high-level-architecture)
+3. [Technology stack (and why each piece)](#3-technology-stack-and-why-each-piece)
+4. [Data model](#4-data-model)
+5. [Backend — every Lambda explained](#5-backend--every-lambda-explained)
+6. [Frontend — structure and screens](#6-frontend--structure-and-screens)
+7. [End-to-end workflows](#7-end-to-end-workflows)
+8. [The reservation lifecycle (deep dive)](#8-the-reservation-lifecycle-deep-dive)
+9. [Authentication and security model](#9-authentication-and-security-model)
+10. [How the AI grading works](#10-how-the-ai-grading-works)
+11. [Running the project locally](#11-running-the-project-locally)
+12. [How the backend was deployed](#12-how-the-backend-was-deployed)
+13. [Design decisions and tradeoffs](#13-design-decisions-and-tradeoffs)
+14. [Known limitations and future work](#14-known-limitations-and-future-work)
+
+---
+
+## 1. The problem and our approach
+
+Returns and unused goods are a massive source of waste. A returned or unused item often still
+has real value, but deciding **what to do with it** (resell, repair, or recycle) is a manual,
+inconsistent process. Buyers, meanwhile, distrust used goods because they can't verify condition.
+
+**AmazeLoop solves both sides:**
+
+- **For sellers / operations:** an automated pipeline grades condition from photos, normalizes a
+  fair price, and recommends the most economical disposition — removing guesswork and human bias.
+- **For buyers:** every listed item carries a **Product Health Card** (AI condition score, noted
+  issues, routing rationale) plus **return-risk insights**, so buyers can trust what they're buying.
+
+**Why two streams?** The same pipeline serves two very different inputs:
+- **Warehouse / Amazon returns** → logistics-optimized, prioritized for fast resale.
+- **Consumer trade-ins** → individuals selling their own items, evaluated for marketplace or recycling.
+
+Treating both through one grading pipeline keeps the system simple while supporting different
+business rules downstream.
+
+---
+
+## 2. High-level architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Flutter Web App (Chrome)                         │
+│  RoleSelection → {Marketplace (guest)}  or  {Sell/Trade-in → Login}   │
+│  BuyerDashboard: Marketplace · Reserved · My Purchases · Notifications │
+│  SellerDashboard: Grade New Item · History · Health Card / PDF        │
+└───────────────┬───────────────────────────────────┬──────────────────┘
+                │ HTTPS (REST/JSON)                  │ Amplify Auth (Cognito)
+                ▼                                     ▼
+┌───────────────────────────────────────┐   ┌────────────────────────┐
+│   API Gateway (HTTP API: bu719hnik3)   │   │  Cognito User Pool      │
+│   Public routes + JWT-protected routes │   │  (email/password,       │
+│   + Cognito JWT authorizer             │◄──┤   custom:role attr)     │
+└───────────────┬────────────────────────┘   └────────────────────────┘
+                │ AWS_PROXY integrations
+                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                        AWS Lambda (Node.js 20)                          │
+│  Grading:  upload-url → grade → ai-grade → route → route-confirm        │
+│  Market:   listings · listing-detail · purchase · purchases             │
+│  System:   notifications · reservation-sweep (scheduled)                │
+└───────┬───────────────────────────┬───────────────────────┬────────────┘
+        ▼                           ▼                       ▼
+┌──────────────┐          ┌───────────────────┐    ┌────────────────────┐
+│  DynamoDB    │          │   Amazon S3        │    │  Amazon Bedrock     │
+│  Evaluations │          │  (product photos,  │    │  (Nova Lite vision  │
+│  ProductsCat │          │   presigned PUTs)  │    │   + text reasoning) │
+│  Notifications│         └───────────────────┘    └────────────────────┘
+└──────────────┘
+        ▲
+        │ rate(15 min)
+┌───────┴────────────┐
+│  EventBridge rule  │ → triggers reservation-sweep Lambda
+└────────────────────┘
+```
+
+**Why serverless + event-driven?** Each pipeline stage is an independent, stateless function with
+DynamoDB as the shared state store. This means:
+- Each step is **independently retryable** — if AI grading fails, price data is still saved.
+- It **scales to zero** — no idle servers, ideal for spiky recommerce volume and a hackathon budget.
+- Stages are **composable** — the same grading chain serves both warehouse and consumer flows.
+
+---
+
+## 3. Technology stack (and why each piece)
+
+| Layer | Technology | Why we chose it |
 | :--- | :--- | :--- |
-| **Grade** | `evaluationId`, `normalizedPrice` | Assigns `sortingQueue` (LOGISTICS vs CONSUMER) |
-| **AI Grade** | `condition`, `resaleValue` | Applies multiplier (1.0 to 0.3) based on score |
-| **Route** | `finalDisposition` | Routes to Resell, Refurbish, or Recycle |
+| Frontend | Flutter (Web) | One codebase for web + mobile; fast UI iteration; strong typed Dart models |
+| Auth | AWS Amplify + Cognito | Managed email/password auth, JWT issuance, and a `custom:role` attribute to separate buyers/sellers without building our own auth |
+| API | API Gateway (HTTP API) | Cheaper/lower-latency than REST API; native JWT authorizer for Cognito; built-in CORS |
+| Compute | AWS Lambda (Node.js 20, ESM) | Pay-per-use, zero idle cost, isolates each pipeline stage |
+| Database | DynamoDB | Serverless, single-digit-ms reads, scales automatically; no connection pooling to manage from Lambda |
+| Object storage | Amazon S3 | Presigned PUT URLs let the browser upload photos directly — no large payloads through Lambda |
+| Vision AI | Bedrock — Nova Lite | Vision model grades condition from photos; structured JSON output contract keeps results parseable |
+| Price/Reason AI | Bedrock — Nova Lite | Estimates fair price when the catalog is sparse; writes one-sentence routing explanations |
+| Scheduling | EventBridge | Cron-style trigger for the reservation expiry sweep without running a server |
+| HTTP client | `http` (Dart) | Lightweight REST calls from the app |
+| PDF | `pdf` + `printing` | Generates a downloadable Health Card report |
+| Image picking | `image_picker` | Cross-platform photo selection for grading |
 
-</details>
+**App dependencies** (`pubspec.yaml`): `amplify_flutter ^2.5.0`, `amplify_auth_cognito ^2.5.0`,
+`http ^1.2.0`, `image_picker ^1.2.1`, `pdf ^3.11.0`, `printing ^5.13.0`.
 
-7. Data Flow Summary
+**Amplify config** (`lib/amplifyconfiguration.dart`): Cognito User Pool `ap-south-1_ybxclrVkJ`,
+App Client `40bdcbv5gfpjkjub33kdhva35h`, region `ap-south-1`, SRP auth, email as username,
+password policy requiring lower/upper/number and 8+ chars.
 
-User submits form
-    │
-    ├─► POST /upload-url × N  ──► S3 (private bucket, public-read policy)
-    │
-    ├─► POST /grade
-    │       ├─ ORD-xxx  → ProductsCatalog GSI query → catalog price
-    │       └─ numeric  → category scan → tier filter → avg OR LLM fallback
-    │       └─ saves Evaluation (evaluationId, normalizedPrice, sortingQueue)
-    │
-    ├─► POST /ai-grade
-    │       ├─ S3 photo fetch → Bedrock Nova vision
-    │       └─ condition + conditionScore + priceMultiplier + bestPhotoIndex
-    │       └─ estimatedResaleValue = normalizedPrice × multiplier
-    │       └─ updates Evaluation
-    │
-    ├─► POST /route
-    │       ├─ Haversine → nearestWarehouseId + distanceKm
-    │       ├─ sortingQueue + condition → recommendedRoute + finalDisposition
-    │       └─ Nova LLM → routeReason (one sentence)
-    │       └─ updates Evaluation
-    │
-    ├─► User selects / overrides disposition
-    │
-    └─► POST /route/confirm
-            └─ chosenDisposition + isOverride + status = "ROUTED"
-            └─ Frontend navigates to History tab
-Document prepared for AmazeLoop — Build for Tomorrow Hackathon submission.
+---
+
+## 4. Data model
+
+Three DynamoDB tables.
+
+### `Evaluations` — the central record (one per graded item)
+
+| Field group | Fields | Set by |
+| :--- | :--- | :--- |
+| Identity | `evaluationId` (PK, `EVAL-<uuid>`), `userId`, `userRole`, `createdAt` | grade |
+| Product | `productName`, `category`, `reason`, `currentPincode` | grade |
+| Pricing | `normalizedPrice`, `reportedPrice`, `avgPrice`, `currency`, `sortingQueue`, `priority` | grade |
+| AI grading | `condition`, `conditionScore`, `priceMultiplier`, `estimatedResaleValue`, `conditionReason`, `bestPhotoIndex` | ai-grade |
+| Routing | `recommendedRoute`, `finalDisposition`, `chosenDisposition`, `routeReason`, `nearestWarehouseId`, `distanceKm`, `isOverride` | route / route-confirm |
+| Lifecycle | `status` (`PENDING` → `ROUTED`) | route-confirm |
+| Photos | `photoUrls[]`, `bestPhotoIndex` | upload-url / ai-grade |
+| Purchase | `buyerUserId`, `purchaseStatus` (`RESERVED`/`SOLD`), `purchaseTimestamp`, `reservationExpiresAt` | purchase / sweep |
+
+**Why partition by `evaluationId`?** Every downstream stage (ai-grade, route, purchase) addresses
+a single item by id — an O(1) `GetItem`. A `userId-createdAt` GSI powers per-user history queries
+sorted newest-first.
+
+### `ProductsCatalog`
+Reference products for fair-price normalization. Partition key `productId`, with an `orderId` GSI
+for O(1) lookups when a returned Amazon order ID is provided.
+
+### `AmazeLoopNotifications`
+In-app notifications. **Partition key `userId`, sort key `createdAt`** — so a single Query returns
+one user's notifications newest-first, and a user can never read another user's notifications.
+
+---
+
+## 5. Backend — every Lambda explained
+
+All Lambdas are Node.js 20 ESM, each with its own least-privilege IAM role. CORS is configured at
+the API level (allow `*` origin, `Authorization`/`Content-Type` headers, `GET/POST/OPTIONS`).
+
+### Grading pipeline
+
+**`AmazeLoopUploadUrlFunction` — `POST /upload-url`**
+Returns a presigned S3 PUT URL plus the final object URL.
+*Why:* the browser uploads photos **directly to S3**, so large image bytes never pass through
+Lambda or API Gateway (avoids payload limits and keeps Lambda fast/cheap).
+
+**`AmazeLoopGradeFunction` — `POST /grade`**
+Creates the Evaluation. If given an order ID, looks up the catalog price; if given a numeric price,
+scans the category and averages comparable items, falling back to a **Bedrock vision price estimate**
+when the catalog is sparse. Assigns `sortingQueue` (`LOGISTICS_OPTIMIZATION_QUEUE` for Amazon returns,
+`CONSUMER_TRADE_IN_QUEUE` for trade-ins) and writes the record.
+*Why the LLM fallback:* prevents an unchecked user-entered price from distorting resale value.
+
+**`AmazeLoopAiGradeFunction` — `POST /ai-grade`**
+Pulls the photos from S3, sends them to Bedrock Nova vision with a strict JSON contract, and derives
+`condition`, `conditionScore`, `priceMultiplier`, `conditionReason`, and `bestPhotoIndex`. Computes
+`estimatedResaleValue = normalizedPrice × priceMultiplier`.
+*Why a hard rule in the prompt:* the model is forced to mark visibly cracked/shattered items as
+"Damaged" so it can't over-value broken goods.
+
+**`AmazeLoopRouteFunction` — `POST /route`**
+Computes the nearest warehouse via the **Haversine formula** over a fixed hub list (BLR, MUM, DEL,
+HYD, MAA, PNQ), then combines `sortingQueue` + `condition` + value + distance into a
+`recommendedRoute` and `finalDisposition`. Asks Bedrock for a one-sentence human-friendly
+`routeReason`.
+*Why rules + LLM:* deterministic rules make the decision auditable; the LLM only writes the
+explanation, never the decision.
+
+**`AmazeLoopRouteConfirmFunction` — `POST /route/confirm`**
+Records the user's `chosenDisposition` (possibly overriding the AI), sets `isOverride`, and flips
+`status = "ROUTED"`. **This is the gate that makes an item eligible for the marketplace.**
+
+**`AmazeLoopEvalListFunction` — `GET /evaluations`**
+Returns a seller's grading history via the `userId-createdAt` GSI (newest first).
+
+### Marketplace + purchase
+
+**`AmazeLoopListingsFunction` — `GET /listings` (public)**
+Scans Evaluations for `status = "ROUTED"`, then keeps only items whose effective disposition
+(`chosenDisposition || finalDisposition`) is `Resell`. Visibility rules:
+- SOLD → hidden forever.
+- RESERVED → hidden **only while the 24h hold is active**; expired holds are treated as available.
+- No buyer → listable.
+Projects each into a buyer-friendly shape (title, price, condition, coverImage, risk, sellerType).
+*Why a Scan:* the dataset is small (hackathon scale); a `status` GSI is the documented upgrade path.
+
+**`AmazeLoopListingDetailFunction` — `GET /listings/{id}` (public)**
+`GetItem` by id, returns the listing fields **plus all `images`** and a **`healthCard`** block
+(condition, score, parsed `issues`, `routeReason`, plus warranty/owners/CO₂ fields). Returns 404 if
+the item isn't found *or* isn't currently listable — so buyers can't probe unrouted items by guessing IDs.
+
+**`AmazeLoopPurchaseFunction` — `POST /purchase` (JWT)**
+Accepts `action: "RESERVE" | "BUY"`.
+- **RESERVE** → `purchaseStatus = RESERVED`, `reservationExpiresAt = now + 24h`.
+- **BUY** → `purchaseStatus = SOLD`; can also convert the buyer's own active reservation.
+Uses **conditional writes** so two buyers can't both win the same item (the loser gets HTTP 409).
+Writes a notification on success.
+*Why identity comes from the JWT, not the body:* the `buyerUserId` is read from the Cognito
+authorizer claims (`sub`), so a buyer cannot impersonate another by editing the request.
+
+**`AmazeLoopMyPurchasesFunction` — `GET /purchases` (JWT)**
+Returns the buyer's items, filterable by `?status=SOLD` (My Purchases) or `?status=RESERVED`
+(Reserved tab). Hides expired reservations.
+
+### System
+
+**`AmazeLoopNotificationsFunction` — `GET /notifications` (JWT)**
+Queries the Notifications table for the caller and returns notifications + `unreadCount`.
+
+**`AmazeLoopReservationSweepFunction` — scheduled (EventBridge `rate(15 minutes)`)**
+Scans for RESERVED items whose `reservationExpiresAt` has passed, **releases them** (clears buyer
+fields so they return to the marketplace) via a conditional update, and writes a
+`RESERVATION_EXPIRED` notification to the buyer who let the hold lapse.
+*Why scheduled + lazy together:* the sweep guarantees items return and buyers get notified even if
+nobody opens the app; the lazy checks in `/listings` and `/purchases` keep reads correct between sweeps.
+
+### API surface (live)
+
+| Method & route | Auth | Purpose |
+| :--- | :--- | :--- |
+| `POST /upload-url` | none | Presigned S3 upload URL |
+| `POST /grade` | none | Create evaluation, normalize price |
+| `POST /ai-grade` | none | Vision grade condition + value |
+| `POST /route` | none | Nearest warehouse + disposition |
+| `POST /route/confirm` | none | Lock disposition, set `ROUTED` |
+| `GET /evaluations` | none | Seller grading history |
+| `GET /listings` | none | Public marketplace feed |
+| `GET /listings/{id}` | none | Listing detail + Health Card |
+| `POST /purchase` | **JWT** | Reserve or buy |
+| `GET /purchases` | **JWT** | Buyer's reserved/sold items |
+| `GET /notifications` | **JWT** | In-app notifications |
+
+---
+
+## 6. Frontend — structure and screens
+
+```
+lib/
+  main.dart                     # Amplify init, theme, opens RoleSelectionScreen
+  constants.dart                # Brand colors (navy, orange, surface, text)
+  amplifyconfiguration.dart     # Cognito pool config
+
+  RoleSelectionScreen.dart      # Front door: Shop Marketplace vs Sell/Trade-in
+  SellerTypeScreen.dart         # Individual vs Warehouse chooser (locks role)
+  SellIntroScreen.dart          # Customer 3-step "how selling works" intro
+
+  BuyerDashboard.dart           # Buyer shell: 4 tabs + auto-refresh on switch
+  MarketplaceTab.dart           # Grid of live listings (responsive, filters)
+  ListingDetailScreen.dart      # Gallery + Health Card + Reserve/Buy buttons
+  ReservedTab.dart              # Active 24h holds with countdown + Buy now
+  PurchasesTab.dart             # SOLD items + View Health Card
+  NotificationsTab.dart         # Purchase/reservation/expiry feed
+
+  views/
+    login_view.dart             # Cognito sign-up/in; LoginEntry routing + JWT capture
+    dashboard_layout.dart       # Seller shell (Grade New Item / History)
+    submit_item_view.dart       # Step 1: details + photos → grade pipeline
+    grading_result_view.dart    # Step 2: AI condition result
+    routing_decision_view.dart  # Step 3: choose/override disposition
+    health_card_view.dart       # Step 4: full Health Card + PDF
+    history_view.dart           # Seller's past evaluations
+
+  data/
+    session.dart                # In-memory userId, role, idToken (+ isSignedIn)
+    report_generator.dart       # PDF Health Card builder
+    repositories/grade_repository.dart   # Single HTTP client for all endpoints
+    models/                     # listing, listing_detail, purchase,
+                                # app_notification, evaluation_input, app_models
+```
+
+**Why a single `GradeRepository`:** one place owns all base URLs, headers, JSON parsing, and the
+`Authorization: Bearer <idToken>` attachment — screens stay thin and consistent.
+
+**Why `Session` is in-memory static:** the app holds the Cognito `sub`, `custom:role`, and raw JWT
+after login for the lifetime of the session; it's the single source of truth for "who am I" and
+"can I call protected endpoints."
+
+---
+
+## 7. End-to-end workflows
+
+### A. Guest browsing (no login)
+```
+RoleSelection ──Shop Marketplace──► BuyerDashboard / Marketplace
+   GET /listings (public) ──► grid of cards
+   tap card ──► GET /listings/{id} (public) ──► gallery + Health Card + risk insights
+   tap Reserve/Buy ──► (not signed in) ──► prompt + push LoginView
+```
+*Why public:* buyers should be able to browse and build trust **before** being asked to sign up —
+lowering friction is the whole point of the prevention/insights layer.
+
+### B. Buyer reserves an item
+```
+ListingDetail ──Reserve──► (login gate if needed) ──► POST /purchase {action: RESERVE}
+   ► purchaseStatus=RESERVED, reservationExpiresAt=now+24h
+   ► item leaves Marketplace, appears in Reserved tab (with countdown)
+   ► notification written ("Item reserved")
+   ► if not bought in 24h → sweep releases it back + "Reservation expired" notification
+```
+
+### C. Buyer buys an item (direct or from a reservation)
+```
+ListingDetail/ReservedTab ──Buy Now──► POST /purchase {action: BUY}
+   ► purchaseStatus=SOLD (clears reservationExpiresAt)
+   ► item leaves Marketplace permanently, appears in My Purchases
+   ► notification written ("Purchase confirmed")
+```
+
+### D. Individual seller (consumer trade-in)
+```
+RoleSelection ──Sell/Trade-in──► SellerType: Individual ──► Login (role locked = customer)
+   ► SellIntroScreen ("Snap photos → AI grades → publish")
+   ► DashboardLayout grading pipeline:
+       POST /upload-url ×N → POST /grade → POST /ai-grade → POST /route → POST /route/confirm
+   ► if finalDisposition = Resell ──► item auto-appears on Marketplace as sellerType=CUSTOMER
+```
+
+### E. Warehouse / operations seller
+```
+RoleSelection ──Sell/Trade-in──► SellerType: Warehouse ──► Login (role locked = warehouse)
+   ► straight to Warehouse Dashboard
+   ► same grading pipeline, sortingQueue=LOGISTICS_OPTIMIZATION_QUEUE, priority HIGH
+   ► Resell items publish as sellerType=WAREHOUSE
+```
+
+**Why "publish" is automatic:** for the MVP, `/listings` treats any `ROUTED + Resell` evaluation as
+a listing. There is no separate publish step — confirming the route *is* publishing. This keeps the
+seller flow to a single, clear endpoint and avoids a stale "draft vs published" state to manage.
+
+---
+
+## 8. The reservation lifecycle (deep dive)
+
+The trickiest piece, because an item must be held for one buyer for 24h, then automatically freed.
+
+```
+            POST /purchase {RESERVE}
+ AVAILABLE ───────────────────────────► RESERVED (buyerUserId, expiresAt = now+24h)
+    ▲                                        │
+    │                                        ├── POST /purchase {BUY} ──► SOLD (terminal)
+    │                                        │
+    │   sweep (every 15 min) or lazy read    │
+    └──────────── expiresAt < now ───────────┘
+        (clears buyer fields, writes RESERVATION_EXPIRED notification)
+```
+
+**Two mechanisms working together:**
+1. **Lazy expiry (on read):** `/listings` treats an expired hold as available, and `/purchases?status=RESERVED`
+   hides expired holds — so the UI is correct *immediately*, even between sweeps.
+2. **Proactive sweep (scheduled):** the EventBridge-triggered Lambda actually clears the fields and
+   fires the expiry notification — so items return and buyers get told even if nobody opens the app.
+
+**Why both?** Lazy-only would never notify or truly free the record; sweep-only would leave the UI
+stale for up to 15 minutes. Together they're correct and eventually-consistent.
+
+**Why conditional writes everywhere?** Reserve/Buy/release all use DynamoDB `ConditionExpression`s
+(e.g. `attribute_not_exists(buyerUserId) OR reservationExpiresAt < :now`). This prevents race
+conditions — two simultaneous buyers, or a buy landing exactly as the sweep runs — without locks.
+
+---
+
+## 9. Authentication and security model
+
+- **Identity:** Cognito User Pool with email/password (SRP flow). On signup, a `custom:role`
+  attribute is set to `warehouse` or `customer`, chosen by the entry path (not a free toggle), so a
+  user can't accidentally grant themselves the wrong role.
+- **Session:** after login, the app stores `sub` (userId), `custom:role`, and the **raw ID token**
+  in `Session`. `Session.isSignedIn` gates protected UI.
+- **Protected endpoints:** `/purchase`, `/purchases`, `/notifications` sit behind a Cognito **JWT
+  authorizer** on API Gateway. The token travels as `Authorization: Bearer <idToken>`; API Gateway
+  validates it (issuer + audience) **before** the Lambda runs. A missing/invalid token → 401.
+- **Server-trusted identity:** Lambdas read `buyerUserId`/`userId` from
+  `requestContext.authorizer.jwt.claims.sub`, never from the request body. This is what makes
+  "you can only see/modify your own purchases and notifications" actually enforceable.
+- **Public endpoints:** `/listings` and `/listings/{id}` are intentionally open so guests can browse.
+  The detail endpoint refuses to return non-listable items, so guessing IDs leaks nothing.
+- **Least privilege:** each Lambda has its own IAM role scoped to exactly the tables/actions it needs
+  (e.g. the listing-detail role only has `dynamodb:GetItem` on `Evaluations`).
+
+---
+
+## 10. How the AI grading works
+
+Amazon **Bedrock (Nova Lite)** is used in three places, always with a **structured output contract**
+so responses are machine-parseable and the model never makes the final business decision:
+
+1. **Condition grading (vision):** photos + a strict prompt → JSON `{condition, conditionScore,
+   priceMultiplier, reasoning}`. A hard rule forces "Damaged" for any cracked/shattered item so
+   broken goods can't be over-valued. `estimatedResaleValue = normalizedPrice × priceMultiplier`.
+2. **Price normalization (fallback):** when the catalog has no comparable items, the model estimates
+   a fair like-new price from the photo + catalog samples, preventing distorted user prices.
+3. **Routing explanation (text):** deterministic rules pick the disposition; the model only writes a
+   one-sentence, human-friendly `routeReason`. Decisions stay auditable; AI only explains them.
+
+The buyer-facing **return-risk** signal is rule-derived today (from `reason` + `condition`) and shown
+as Low/Medium/High insight cards on the listing detail — the prevention layer that nudges buyers to
+read the Health Card before buying.
+
+---
+
+## 11. Running the project locally
+
+**Prerequisites:** Flutter SDK (Dart `^3.8.1`), Chrome, and AWS credentials if you want to redeploy
+backend functions.
+
+```bash
+# install dependencies
+flutter pub get
+
+# run the web app in Chrome (talks to the live AWS backend)
+flutter run -d chrome
+```
+
+The app boots into the role-selection screen. "Shop Marketplace" works with no login; "Sell /
+Trade-in" and the buy/reserve actions require a Cognito account (sign up in-app).
+
+> Long-running commands like `flutter run` should be started in your own terminal — they don't
+> terminate on their own.
+
+**Backend test (no auth needed for public routes):**
+```bash
+curl https://bu719hnik3.execute-api.ap-south-1.amazonaws.com/listings
+```
+
+---
+
+## 12. How the backend was deployed
+
+Each Lambda folder under `backend/` contains `index.mjs`, `package.json`, and a least-privilege
+`policy.json`. The deploy pattern (per function):
+
+```bash
+# 1. install deps and zip
+cd backend/<name> && npm install --omit=dev
+zip -rq <name>-function.zip index.mjs node_modules package.json package-lock.json
+
+# 2. create an execution role (trust policy in scripts/lambda-trust.json)
+aws iam create-role --role-name AmazeLoop<Name>FunctionRole \
+  --assume-role-policy-document file://scripts/lambda-trust.json
+aws iam attach-role-policy --role-name AmazeLoop<Name>FunctionRole \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+aws iam put-role-policy --role-name AmazeLoop<Name>FunctionRole \
+  --policy-name AmazeLoop<Name>Ddb --policy-document file://backend/<name>/policy.json
+
+# 3. create the function
+aws lambda create-function --function-name AmazeLoop<Name>Function \
+  --runtime nodejs20.x --handler index.handler \
+  --role arn:aws:iam::<acct>:role/AmazeLoop<Name>FunctionRole \
+  --zip-file fileb://backend/<name>/<name>-function.zip --region ap-south-1
+
+# 4. allow API Gateway to invoke, create integration + route
+aws lambda add-permission --function-name AmazeLoop<Name>Function \
+  --statement-id apigw-invoke --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:ap-south-1:<acct>:bu719hnik3/*/*"
+aws apigatewayv2 create-integration --api-id bu719hnik3 --integration-type AWS_PROXY \
+  --integration-uri <lambda-arn> --integration-method POST --payload-format-version 2.0
+aws apigatewayv2 create-route --api-id bu719hnik3 \
+  --route-key "GET /<route>" --target integrations/<integrationId>
+  # add --authorization-type JWT --authorizer-id <id> for protected routes
+```
+
+The **reservation sweep** additionally has an EventBridge rule:
+```bash
+aws events put-rule --name AmazeLoopReservationSweepSchedule --schedule-expression "rate(15 minutes)"
+aws events put-targets --rule AmazeLoopReservationSweepSchedule \
+  --targets Id=sweep,Arn=<sweep-lambda-arn>
+```
+
+**Note:** `node_modules/`, `*.zip`, `package-lock.json`, and `policy.json` are git-ignored by
+project convention — only `index.mjs` and `package.json` are tracked. Re-`npm install` and re-zip
+when deploying.
+
+---
+
+## 13. Design decisions and tradeoffs
+
+| Decision | Why | Tradeoff |
+| :--- | :--- | :--- |
+| Serverless (Lambda) over a server | Zero idle cost, auto-scale, per-stage isolation | Cold starts; per-function deploy overhead |
+| DynamoDB Scan for listings/purchases | Hackathon dataset is tiny; trivial to write | Doesn't scale — documented GSI upgrade path exists |
+| Identity from JWT claims, not body | Prevents impersonation; enforceable ownership | Requires the Cognito authorizer to be attached |
+| Rules decide routing, LLM only explains | Auditable, deterministic dispositions | LLM text can occasionally be generic |
+| Auto-publish (`ROUTED + Resell` = listed) | One clear seller endpoint, no draft state | No manual "publish later" control |
+| Lazy expiry + 15-min sweep | Correct reads instantly + guaranteed cleanup/notify | Item can take up to ~15 min to truly reappear after expiry |
+| In-app notifications (DynamoDB) | Simple, no extra infra, works in-browser | Not real push/email/SMS |
+| Conditional writes for reserve/buy | Race-safe without locks | Slightly more complex update expressions |
+| Presigned S3 uploads | Big images skip Lambda/API Gateway | Client must handle the two-step upload |
+
+---
+
+## 14. Known limitations and future work
+
+- **Notifications are in-app only.** Real push/email would add an SNS topic (email subscription) or
+  web-push/FCM on top of the existing notification writes.
+- **Health Card warranty/owners/CO₂ are placeholders.** They return stable default values; wiring a
+  warranty registry, ownership history, and an LCA service would make them real.
+- **Reservation release isn't instant.** Items reappear within ~15 min of expiry (sweep cadence),
+  though reads are correct immediately via lazy checks. A per-item TTL/Step Function could make it
+  exact if needed.
+- **Listings/purchases use Scans.** Add a `status-createdAt` GSI (listings) and a
+  `buyerUserId-purchaseTimestamp` GSI (purchases) to switch to Queries at scale — the code already
+  branches on a `BUYER_INDEX` env var for the purchases path.
+- **Post-login return-to-listing.** After the reserve/buy login gate, the user lands on the dashboard
+  rather than back on the exact listing; a result-passing navigation could restore context.
+- **Reselling a purchased item** opens a blank grading form; pre-filling from the purchase would
+  streamline the circular "every item can have multiple lives" flow.
+
+---
+
+*Built for the AmazeLoop — Build for Tomorrow hackathon.*

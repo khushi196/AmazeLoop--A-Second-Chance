@@ -63,6 +63,7 @@ function toPurchase(item) {
     coverImage: coverImage(item),
     purchaseStatus: item.purchaseStatus || "RESERVED",
     purchaseTimestamp: item.purchaseTimestamp || null,
+    reservationExpiresAt: item.reservationExpiresAt || null,
   };
 }
 
@@ -92,6 +93,10 @@ export const handler = async (event) => {
     Number(event?.queryStringParameters?.limit) || 50,
     100
   );
+
+  // Optional status filter: SOLD (My Purchases) or RESERVED (Reserved tab).
+  const statusFilter = (event?.queryStringParameters?.status || "")
+    .toUpperCase();
 
   let items = [];
   try {
@@ -126,7 +131,23 @@ export const handler = async (event) => {
     });
   }
 
+  const nowIso = new Date().toISOString();
+
   const purchases = items
+    .filter((it) => {
+      if (!statusFilter) return true;
+      if (it.purchaseStatus !== statusFilter) return false;
+      // For RESERVED, hide holds that have already expired — the sweep will
+      // release them back to the marketplace.
+      if (
+        statusFilter === "RESERVED" &&
+        it.reservationExpiresAt &&
+        it.reservationExpiresAt < nowIso
+      ) {
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) =>
       (b.purchaseTimestamp || "").localeCompare(a.purchaseTimestamp || "")
     )

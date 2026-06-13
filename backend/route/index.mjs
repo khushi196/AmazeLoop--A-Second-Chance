@@ -10,14 +10,17 @@
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
 // ---------------------------------------------------------------------------
 // Configuration & shared clients
 // ---------------------------------------------------------------------------
 const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-lite-v1:0";
+// Best available model that works without the Anthropic use-case form.
+// Switch to "global.anthropic.claude-opus-4-6-v1" once Anthropic access is
+// granted in the Bedrock console.
+const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-pro-v1:0";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 const bedrock = new BedrockRuntimeClient({ region: REGION });
@@ -98,75 +101,247 @@ function nearestWarehouse(pincode) {
   }
   return best;
 }
-
 // ---------------------------------------------------------------------------
-// Routing decision
+// Routing decision — economics-based (net-profit) router
 // ---------------------------------------------------------------------------
 const REASONABLE_DISTANCE_KM = 600;
 
 /**
- * Combines sortingQueue + condition + value + distance into a recommended route
- * and a final disposition bucket. Returns { recommendedRoute, finalDisposition }.
+ * Scores a single allowed route. Higher is better.
+ *   routeScore = net-value score + condition + confidence + route fit - cost burden
+ */
+function scoreRoute({ netValue, conditionScore, confidence, routeFit, costBurden }) {
+  const normalizedNetScore = Math.max(0, Math.min(netValue / 5000, 1));
+  const costPenalty = Math.max(0, Math.min(costBurden, 1));
+  return (
+    normalizedNetScore * 0.45 +
+    conditionScore * 0.25 +
+    confidence * 0.15 +
+    routeFit * 0.15 -
+    costPenalty * 0.20
+  );
+}
+
+/**
+ * Eligibility decides which routes are allowed; scoring ranks the allowed
+ * routes; net-value guardrails prevent uneconomical refurbishing.
+ * Returns "Resell" | "Refurbish" | "Recycle".
+ */
+function decideRouteDynamic({
+  condition,
+  conditionScore,
+  confidence = 1,
+  normalizedPrice,
+  priceMultiplier,
+  postRefurbMultiplier,
+  repairable,
+  refurbishmentNeeded, // none | cleaning | minor_repair | major_repair
+  visibleIssues = [],
+  pickupCost,
+  qcCost,
+  cleaningCost,
+  listingCost,
+  deliveryCost,
+  platformRiskBuffer,
+  repairCost,
+  refurbHandlingCost,
+  refurbRiskBuffer,
+  sortingCost,
+  recyclingTransportCost,
+  recycleRecoveryValue,
+  minimumProfitThreshold = 300,
+}) {
+  const asIsResaleValue = normalizedPrice * priceMultiplier;
+  const postRefurbResaleValue = normalizedPrice * postRefurbMultiplier;
+
+  const directResellCost =
+    pickupCost + qcCost + cleaningCost + listingCost + deliveryCost + platformRiskBuffer;
+  const refurbishCost =
+    pickupCost + qcCost + repairCost + refurbHandlingCost + listingCost + deliveryCost + refurbRiskBuffer;
+  const recycleCost = pickupCost + sortingCost + recyclingTransportCost;
+
+  const directResellNet = asIsResaleValue - directResellCost;
+  const refurbishNet = postRefurbResaleValue - refurbishCost;
+  const recycleNet = recycleRecoveryValue - recycleCost;
+  const valueUplift = postRefurbResaleValue - asIsResaleValue;
+
+  const hasSevereDamage = condition === "Damaged" && repairable !== true;
+  const hasDirectResaleBlockers = visibleIssues.some((issue) =>
+    /crack|shatter|broken|torn|hole|missing|detached|exposed wiring|major dent|unsafe/i.test(issue)
+  );
+
+  const directEligible =
+    !hasSevereDamage &&
+    !hasDirectResaleBlockers &&
+    conditionScore >= 0.45 &&
+    directResellNet >= minimumProfitThreshold;
+
+  const refurbishEligible =
+    repairable === true &&
+    refurbishmentNeeded !== "none" &&
+    repairCost <= postRefurbResaleValue * 0.25 &&
+    valueUplift >= refurbishCost * 1.2 &&
+    refurbishNet >= minimumProfitThreshold;
+
+  const recycleEligible = true;
+
+  const directScore = directEligible
+    ? scoreRoute({
+        netValue: directResellNet,
+        conditionScore,
+        confidence,
+        routeFit: condition === "Like New" || condition === "Good" ? 1 : 0.75,
+        costBurden: directResellCost / Math.max(asIsResaleValue, 1),
+      })
+    : -Infinity;
+
+  const refurbishScore = refurbishEligible
+    ? scoreRoute({
+        netValue: refurbishNet,
+        conditionScore: Math.min(conditionScore + 0.2, 1),
+        confidence,
+        routeFit: refurbishmentNeeded === "minor_repair" ? 0.9 : 0.65,
+        costBurden: refurbishCost / Math.max(postRefurbResaleValue, 1),
+      })
+    : -Infinity;
+
+  const recycleScore = recycleEligible
+    ? scoreRoute({
+        netValue: recycleNet,
+        conditionScore: condition === "Damaged" ? 0.8 : 0.35,
+        confidence,
+        routeFit: hasSevereDamage ? 1 : 0.4,
+        costBurden: recycleCost / Math.max(recycleRecoveryValue, 1),
+      })
+    : -Infinity;
+
+  // Refurbish must beat direct resale meaningfully.
+  const refurbishBeatsDirect =
+    refurbishScore > directScore && refurbishNet >= directResellNet * 1.15;
+
+  if (refurbishEligible && refurbishBeatsDirect) return "Refurbish";
+  if (directScore >= refurbishScore && directScore >= recycleScore) return "Resell";
+  return "Recycle";
+}
+
+// ---------------------------------------------------------------------------
+// Cost model + input assembler
+// ---------------------------------------------------------------------------
+// Realistic INR defaults for the reverse-logistics cost breakdown. Fixed costs
+// are flat; pickup/delivery/recycle-transport scale with distance. Repair and
+// risk buffers scale with the item's value. Tune these as real ops data lands.
+const COST = {
+  qcCost: 50,
+  cleaningCost: 40,
+  listingCost: 30,
+  refurbHandlingCost: 60,
+  sortingCost: 20,
+  pickupBase: 80,
+  pickupPerKm: 1.2,
+  deliveryBase: 60,
+  deliveryPerKm: 1.0,
+  recycleTransportBase: 30,
+  recycleTransportPerKm: 0.5,
+  platformRiskRate: 0.05, // 5% of as-is resale value
+  refurbRiskRate: 0.08,   // 8% of post-refurb resale value
+  recycleRecoveryRate: 0.05, // scrap/parts value ~5% of normalized price
+};
+
+// How much value a refurbished unit can recover (fraction of normalizedPrice),
+// and what level of work each condition needs.
+const REFURB_PROFILE = {
+  "Like New": { mult: 1.0, needed: "none", repairable: false },
+  "Good":     { mult: 0.85, needed: "cleaning", repairable: true },
+  "Used":     { mult: 0.75, needed: "minor_repair", repairable: true },
+  "Damaged":  { mult: 0.6,  needed: "major_repair", repairable: null }, // repairable decided by blockers
+};
+
+const STRUCTURAL_BLOCKER =
+  /crack|shatter|broken|torn|hole|missing|detached|exposed wiring|major dent|unsafe/i;
+
+/** Derives the full economic input set from an evaluation record. */
+function buildEconomics(r) {
+  const condition = r.condition || "Used";
+  const conditionScore = Number(r.conditionScore);
+  const confidence = r.conditionConfidence == null ? 1 : Number(r.conditionConfidence);
+  const normalizedPrice = Number(r.normalizedPrice) || 0;
+  const distanceKm = Number(r.distanceKm) || 0;
+  const visibleIssues = Array.isArray(r.visibleIssues) ? r.visibleIssues : [];
+
+  // As-is multiplier: prefer the stored priceMultiplier, else derive from resale value.
+  let priceMultiplier = Number(r.priceMultiplier);
+  if (Number.isNaN(priceMultiplier) || priceMultiplier <= 0) {
+    const resale = Number(r.estimatedResaleValue) || 0;
+    priceMultiplier = normalizedPrice > 0 ? resale / normalizedPrice : 0.5;
+  }
+
+  const profile = REFURB_PROFILE[condition] || REFURB_PROFILE["Used"];
+  const postRefurbMultiplier = Math.max(profile.mult, priceMultiplier);
+
+  // Damaged is repairable only when there are no structural blockers.
+  const hasBlocker = visibleIssues.some((i) => STRUCTURAL_BLOCKER.test(String(i)));
+  const repairable = condition === "Damaged" ? !hasBlocker : profile.repairable === true;
+  const refurbishmentNeeded = profile.needed;
+
+  // Repair cost scales with the work level and the item's value.
+  const repairRate =
+    refurbishmentNeeded === "major_repair" ? 0.18 :
+    refurbishmentNeeded === "minor_repair" ? 0.08 :
+    refurbishmentNeeded === "cleaning" ? 0.02 : 0;
+  const repairCost = Math.round(normalizedPrice * repairRate);
+
+  const asIsResaleValue = normalizedPrice * priceMultiplier;
+  const postRefurbResaleValue = normalizedPrice * postRefurbMultiplier;
+
+  return {
+    condition,
+    conditionScore: Number.isNaN(conditionScore) ? 0.5 : conditionScore,
+    confidence: Number.isNaN(confidence) ? 1 : confidence,
+    normalizedPrice,
+    priceMultiplier,
+    postRefurbMultiplier,
+    repairable,
+    refurbishmentNeeded,
+    visibleIssues,
+    pickupCost: Math.round(COST.pickupBase + COST.pickupPerKm * distanceKm),
+    qcCost: COST.qcCost,
+    cleaningCost: COST.cleaningCost,
+    listingCost: COST.listingCost,
+    deliveryCost: Math.round(COST.deliveryBase + COST.deliveryPerKm * distanceKm),
+    platformRiskBuffer: Math.round(asIsResaleValue * COST.platformRiskRate),
+    repairCost,
+    refurbHandlingCost: COST.refurbHandlingCost,
+    refurbRiskBuffer: Math.round(postRefurbResaleValue * COST.refurbRiskRate),
+    sortingCost: COST.sortingCost,
+    recyclingTransportCost: Math.round(COST.recycleTransportBase + COST.recycleTransportPerKm * distanceKm),
+    recycleRecoveryValue: Math.round(normalizedPrice * COST.recycleRecoveryRate),
+  };
+}
+
+/** Maps a final disposition + queue into the operator-facing route label. */
+function recommendedRouteFor(disposition, sortingQueue) {
+  if (disposition === "Recycle") return "Recycle / parts harvesting at nearest warehouse";
+  if (disposition === "Refurbish") return "Send to nearest warehouse for refurbishment";
+  // Resell
+  if (sortingQueue === "LOGISTICS_OPTIMIZATION_QUEUE") return "Resell via Amazon (open box)";
+  if (sortingQueue === "CONSUMER_TRADE_IN_QUEUE") return "List on local marketplace / consumer resale";
+  return "Resell via Amazon (open box)";
+}
+
+/**
+ * Entry point used by the handler. Keeps the { recommendedRoute,
+ * finalDisposition } contract while delegating the decision to the
+ * economics-based router.
  */
 function decideRoute(r) {
-  const condition = r.condition;
-  const conditionScore = Number(r.conditionScore);
-  const normalizedPrice = Number(r.normalizedPrice) || 0;
-  const resaleValue = Number(r.estimatedResaleValue) || 0;
-  const distanceKm = r.distanceKm;
-
-  const isLikeNewOrGood = condition === "Like New" || condition === "Good";
-  const resaleAtLeastHalf = normalizedPrice > 0 && resaleValue >= 0.5 * normalizedPrice;
-  const veryLowValue = normalizedPrice > 0 && resaleValue < 0.15 * normalizedPrice;
-  const distanceReasonable = distanceKm == null || distanceKm <= REASONABLE_DISTANCE_KM;
-
-  // HARD RULE: Damaged items always go to Recycle — no resale pathway.
-  if (condition === "Damaged") {
-    return {
-      recommendedRoute: "Recycle / parts harvesting at nearest warehouse",
-      finalDisposition: "Recycle",
-    };
-  }
-
-  // --- recommendedRoute ---
-  let recommendedRoute;
-  if (r.sortingQueue === "LOGISTICS_OPTIMIZATION_QUEUE") {
-    // Returned Amazon order
-    if (isLikeNewOrGood && resaleAtLeastHalf) {
-      recommendedRoute = "Resell via Amazon (open box)";
-    } else {
-      recommendedRoute = "Send to nearest warehouse for refurbishment / liquidation";
-    }
-  } else if (r.sortingQueue === "CONSUMER_TRADE_IN_QUEUE") {
-    // Unused at home
-    if (isLikeNewOrGood) {
-      recommendedRoute = "Consumer trade-in (gift card / credits)";
-    } else if (condition === "Used" && distanceReasonable && !veryLowValue) {
-      recommendedRoute = "Local marketplace / C2C resale via nearest warehouse";
-    } else {
-      // Used with very low value or unreasonable distance → Recycle
-      recommendedRoute = "Recycle / parts harvesting at nearest warehouse";
-    }
-  } else {
-    // Unknown queue — fall back on condition.
-    recommendedRoute = isLikeNewOrGood
-      ? "Resell via Amazon (open box)"
-      : "Send to nearest warehouse for refurbishment / liquidation";
-  }
-
-  // --- finalDisposition (A+/B+ -> Resell, B/C -> Refurbish, D -> Recycle) ---
-  let finalDisposition;
-  if (condition === "Like New" || (condition === "Good" && conditionScore >= 0.8)) {
-    finalDisposition = "Resell";
-  } else if (condition === "Good" || (condition === "Used" && !veryLowValue && distanceReasonable)) {
-    finalDisposition = "Refurbish";
-  } else {
-    // Used with very low value / bad distance, or any other case
-    finalDisposition = "Recycle";
-  }
-
-  return { recommendedRoute, finalDisposition };
+  const economics = buildEconomics(r);
+  const finalDisposition = decideRouteDynamic(economics);
+  return {
+    recommendedRoute: recommendedRouteFor(finalDisposition, r.sortingQueue),
+    finalDisposition,
+  };
 }
+
 
 /**
  * Asks the Bedrock vision/text model for a one-sentence, human-friendly
@@ -177,30 +352,32 @@ async function explainRoute(r) {
   const money = (v) => (v == null ? "unknown" : `Rs.${Math.round(Number(v))}`);
   const promptText =
     `You are explaining a recommerce routing decision to a warehouse operator.\n` +
+    `The backend has already made the final routing decision using deterministic rules. ` +
+    `You must NOT change, question, or override the chosen disposition. Only explain it clearly.\n\n` +
     `Product: ${r.productName || "item"} (category: ${r.category || "unknown"}).\n` +
     `Condition: ${r.condition || "unknown"} (score ${r.conditionScore ?? "n/a"}).\n` +
-    `Fair like-new price: ${money(r.normalizedPrice)}; estimated resale value: ${money(r.estimatedResaleValue)}.\n` +
+    `Fair like-new price: ${money(r.normalizedPrice)}.\n` +
+    `Estimated resale value: ${money(r.estimatedResaleValue)}.\n` +
     `Distance to nearest warehouse: ${r.distanceKm == null ? "unknown" : r.distanceKm + " km"}.\n` +
     `Chosen disposition: ${r.finalDisposition}.\n\n` +
-    `In ONE short sentence, explain why ${r.finalDisposition} is the best next life for this product, ` +
-    `considering its condition, value, and distance. Respond with only the sentence, no preamble.`;
-
-  const payload = {
-    messages: [{ role: "user", content: [{ text: promptText }] }],
-    inferenceConfig: { maxTokens: 120, temperature: 0.2, topP: 0.9 },
-  };
+    `Write ONE short sentence explaining why ${r.finalDisposition} is appropriate, ` +
+    `considering condition, resale value, and distance.\n` +
+    `Rules:\n` +
+    `- Do not mention a different route.\n` +
+    `- Do not add uncertainty unless the inputs indicate uncertainty.\n` +
+    `- Do not use markdown.\n` +
+    `- Do not add preamble.\n` +
+    `- Respond with only one sentence.`;
 
   try {
     const resp = await bedrock.send(
-      new InvokeModelCommand({
+      new ConverseCommand({
         modelId: MODEL_ID,
-        contentType: "application/json",
-        accept: "application/json",
-        body: JSON.stringify(payload),
+        messages: [{ role: "user", content: [{ text: promptText }] }],
+        inferenceConfig: { maxTokens: 120, temperature: 0.2, topP: 0.9 },
       })
     );
-    const decoded = JSON.parse(Buffer.from(resp.body).toString("utf-8"));
-    const text = (decoded?.output?.message?.content?.[0]?.text || "").trim();
+    const text = (resp?.output?.message?.content?.[0]?.text || "").trim();
     if (text) return text.replace(/^["']|["']$/g, "");
   } catch (e) {
     console.error(`Route explanation failed: ${e.message}`);
@@ -261,6 +438,9 @@ export const handler = async (event) => {
     priority: item.priority ?? null,
     condition: item.condition ?? null,
     conditionScore: item.conditionScore ?? null,
+    conditionConfidence: item.conditionConfidence ?? null,
+    priceMultiplier: item.priceMultiplier ?? null,
+    visibleIssues: Array.isArray(item.visibleIssues) ? item.visibleIssues : [],
     normalizedPrice: item.normalizedPrice ?? null,
     estimatedResaleValue: item.estimatedResaleValue ?? null,
     pincode: item.currentPincode ?? null,

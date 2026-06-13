@@ -6,16 +6,20 @@ import 'data/session.dart';
 import 'ListingDetailScreen.dart';
 import 'views/login_view.dart';
 
-class PurchasesTab extends StatefulWidget {
-  const PurchasesTab({Key? key}) : super(key: key);
+/// Shows the buyer's active reservations (24h holds) with a Buy action and a
+/// time-remaining indicator. Items not bought before expiry are released by
+/// the backend sweep and disappear from this list.
+class ReservedTab extends StatefulWidget {
+  const ReservedTab({Key? key}) : super(key: key);
 
   @override
-  State<PurchasesTab> createState() => PurchasesTabState();
+  State<ReservedTab> createState() => ReservedTabState();
 }
 
-class PurchasesTabState extends State<PurchasesTab> {
+class ReservedTabState extends State<ReservedTab> {
   final GradeRepository _repo = GradeRepository();
   Future<List<Purchase>>? _future;
+  String? _buyingId;
 
   @override
   void initState() {
@@ -23,19 +27,16 @@ class PurchasesTabState extends State<PurchasesTab> {
     _maybeLoad();
   }
 
-  /// Public entry-point so a parent (e.g. BuyerDashboard) can force a refresh
-  /// when this tab becomes visible — ensures a just-reserved item shows up.
+  /// Public so BuyerDashboard can refresh when this tab becomes visible.
   void reload() {
     if (!mounted) return;
     setState(_maybeLoad);
   }
 
   void _maybeLoad() {
-    if (Session.isSignedIn) {
-      _future = _repo.fetchPurchases(status: 'SOLD');
-    } else {
-      _future = null;
-    }
+    _future = Session.isSignedIn
+        ? _repo.fetchPurchases(status: 'RESERVED')
+        : null;
   }
 
   Future<void> _refresh() async {
@@ -43,9 +44,7 @@ class PurchasesTabState extends State<PurchasesTab> {
     if (_future != null) {
       try {
         await _future;
-      } catch (_) {
-        // Errors are surfaced through the FutureBuilder error state.
-      }
+      } catch (_) {}
     }
   }
 
@@ -54,13 +53,14 @@ class PurchasesTabState extends State<PurchasesTab> {
     return '$symbol${value.toStringAsFixed(0)}';
   }
 
-  String _formatDate(DateTime? d) {
-    if (d == null) return '—';
-    final local = d.toLocal();
-    const months = [
-      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec',
-    ];
-    return 'Ordered ${months[local.month - 1]} ${local.day}, ${local.year}';
+  String _timeLeft(DateTime? expiry) {
+    if (expiry == null) return 'No expiry';
+    final diff = expiry.toLocal().difference(DateTime.now());
+    if (diff.isNegative) return 'Expired';
+    final h = diff.inHours;
+    final m = diff.inMinutes % 60;
+    if (h > 0) return '${h}h ${m}m left';
+    return '${m}m left';
   }
 
   @override
@@ -70,7 +70,7 @@ class PurchasesTabState extends State<PurchasesTab> {
       appBar: AppBar(
         backgroundColor: amazonNavy,
         elevation: 0,
-        title: const Text('My Purchases', style: TextStyle(color: Colors.white)),
+        title: const Text('Reserved', style: TextStyle(color: Colors.white)),
         automaticallyImplyLeading: false,
         actions: [
           if (Session.isSignedIn)
@@ -85,9 +85,6 @@ class PurchasesTabState extends State<PurchasesTab> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Auth gate
-  // -------------------------------------------------------------------------
   Widget _buildLoginGate() {
     return Center(
       child: Padding(
@@ -98,18 +95,12 @@ class PurchasesTabState extends State<PurchasesTab> {
             Icon(Icons.lock_outline, size: 56, color: Colors.grey[400]),
             const SizedBox(height: 16),
             const Text(
-              'Sign in to view your purchases',
+              'Sign in to view your reservations',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: textPrimary,
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Items you reserve from the marketplace will appear here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -133,9 +124,6 @@ class PurchasesTabState extends State<PurchasesTab> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // List
-  // -------------------------------------------------------------------------
   Widget _buildList() {
     return RefreshIndicator(
       color: amazonOrange,
@@ -151,24 +139,25 @@ class PurchasesTabState extends State<PurchasesTab> {
           if (snapshot.hasError) {
             return _buildError(snapshot.error.toString());
           }
-          final purchases = snapshot.data ?? const <Purchase>[];
-          if (purchases.isEmpty) {
+          final reserved = snapshot.data ?? const <Purchase>[];
+          if (reserved.isEmpty) {
             return _buildEmpty();
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: purchases.length,
-            itemBuilder: (_, i) => _buildCard(purchases[i]),
+            itemCount: reserved.length,
+            itemBuilder: (_, i) => _buildCard(reserved[i]),
           );
         },
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Card
-  // -------------------------------------------------------------------------
   Widget _buildCard(Purchase p) {
+    final expiry = p.reservationExpiresAt;
+    final expired = expiry != null && expiry.toLocal().isBefore(DateTime.now());
+    final isBuying = _buyingId == p.evaluationId;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: Colors.white,
@@ -212,13 +201,8 @@ class PurchasesTabState extends State<PurchasesTab> {
                           'Condition: ${p.condition}',
                           style: const TextStyle(color: Colors.grey, fontSize: 12),
                         ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatDate(p.purchaseTimestamp),
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
                       const SizedBox(height: 6),
-                      _statusPill(p.purchaseStatus),
+                      _timePill(expiry, expired),
                     ],
                   ),
                 ),
@@ -246,7 +230,33 @@ class PurchasesTabState extends State<PurchasesTab> {
                     foregroundColor: amazonNavy,
                     side: BorderSide(color: Colors.grey.shade400),
                   ),
-                  onPressed: () => _viewHealthCard(p),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ListingDetailScreen(listingId: p.evaluationId),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  icon: isBuying
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Icon(Icons.shopping_cart_checkout, size: 16),
+                  label: const Text('Buy now'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: amazonOrange,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                  ),
+                  onPressed: (isBuying || expired) ? null : () => _buy(p),
                 ),
               ],
             ),
@@ -256,22 +266,33 @@ class PurchasesTabState extends State<PurchasesTab> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // View Health Card — reuses the buyer-side listing detail screen, which
-  // already renders the full Product Health Card section.
-  // -------------------------------------------------------------------------
-  void _viewHealthCard(Purchase p) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ListingDetailScreen(listingId: p.evaluationId),
-      ),
-    );
+  Future<void> _buy(Purchase p) async {
+    setState(() => _buyingId = p.evaluationId);
+    try {
+      await _repo.buyListing(p.evaluationId);
+      if (!mounted) return;
+      setState(() {
+        _buyingId = null;
+        _maybeLoad(); // refresh — item leaves the reserved list
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade700,
+          content: Text('Purchased "${p.title}".'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _buyingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
-  // -------------------------------------------------------------------------
-  // Visual helpers
-  // -------------------------------------------------------------------------
   Widget _thumb(String? url) {
     if (url == null || url.isEmpty) {
       return Container(
@@ -289,28 +310,9 @@ class PurchasesTabState extends State<PurchasesTab> {
     );
   }
 
-  Widget _statusPill(String status) {
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 'SOLD':
-      case 'DELIVERED':
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade800;
-        break;
-      case 'SHIPPED':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
-        break;
-      case 'CANCELLED':
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade800;
-        break;
-      case 'RESERVED':
-      default:
-        bg = Colors.amber.shade50;
-        fg = Colors.amber.shade900;
-    }
+  Widget _timePill(DateTime? expiry, bool expired) {
+    final bg = expired ? Colors.red.shade50 : Colors.amber.shade50;
+    final fg = expired ? Colors.red.shade800 : Colors.amber.shade900;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -318,21 +320,25 @@ class PurchasesTabState extends State<PurchasesTab> {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: fg.withOpacity(0.3)),
       ),
-      child: Text(
-        status,
-        style: TextStyle(
-          color: fg,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.0,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            _timeLeft(expiry),
+            style: TextStyle(
+              color: fg,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Empty / error states
-  // -------------------------------------------------------------------------
   Widget _buildEmpty() {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -342,10 +348,10 @@ class PurchasesTabState extends State<PurchasesTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.shopping_bag_outlined, size: 56, color: Colors.grey[400]),
+              Icon(Icons.bookmark_border, size: 56, color: Colors.grey[400]),
               const SizedBox(height: 16),
               const Text(
-                'No purchases yet',
+                'No active reservations',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -354,7 +360,7 @@ class PurchasesTabState extends State<PurchasesTab> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Browse the marketplace and reserve items you want.',
+                'Reserve an item from the marketplace to hold it for 24 hours.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
@@ -377,7 +383,7 @@ class PurchasesTabState extends State<PurchasesTab> {
               Icon(Icons.cloud_off, size: 56, color: Colors.grey[400]),
               const SizedBox(height: 16),
               const Text(
-                "Couldn't load your purchases",
+                "Couldn't load your reservations",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

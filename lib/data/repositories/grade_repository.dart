@@ -5,6 +5,7 @@ import '../models/evaluation_input.dart';
 import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/purchase.dart';
+import '../models/app_notification.dart';
 import '../session.dart';
 
 /// Talks to the real AmazeLoop backend (API Gateway).
@@ -21,6 +22,7 @@ class GradeRepository {
   static const String _listingsUrl = '$_baseUrl/listings';
   static const String _purchaseUrl = '$_baseUrl/purchase';
   static const String _purchasesUrl = '$_baseUrl/purchases';
+  static const String _notificationsUrl = '$_baseUrl/notifications';
 
   /// Uploads a single image to S3 via a presigned URL and returns the public
   /// object URL (to be stored as a photoUrl on the evaluation).
@@ -258,13 +260,14 @@ class GradeRepository {
     throw Exception('Failed to load listing detail (${response.statusCode}).');
   }
 
-  /// Reserves a listing for the currently authenticated buyer. Sends the
-  /// Cognito ID token from [Session] as a Bearer token so API Gateway's
-  /// Cognito authorizer can identify the buyer.
-  ///
-  /// Returns the parsed response body (e.g. { evaluationId, buyerUserId,
-  /// purchaseStatus, purchaseTimestamp, alreadyReserved? }).
-  Future<Map<String, dynamic>> reserveListing(String evaluationId) async {
+  /// Reserves or buys a listing for the authenticated buyer.
+  /// [action] is "RESERVE" (24h hold) or "BUY" (complete purchase).
+  /// Sends the Cognito ID token so API Gateway's authorizer identifies the
+  /// buyer. Returns the parsed response body.
+  Future<Map<String, dynamic>> purchaseListing(
+    String evaluationId, {
+    required String action,
+  }) async {
     final token = Session.idToken;
     late http.Response response;
     try {
@@ -274,7 +277,7 @@ class GradeRepository {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({'evaluationId': evaluationId}),
+        body: jsonEncode({'evaluationId': evaluationId, 'action': action}),
       );
     } catch (e) {
       throw Exception('Network error: $e');
@@ -291,16 +294,56 @@ class GradeRepository {
       return decoded;
     }
     final message = decoded['error']?.toString() ??
-        'Failed to reserve listing (${response.statusCode}).';
+        'Failed to ${action.toLowerCase()} listing (${response.statusCode}).';
     throw Exception(message);
   }
 
-  /// Fetches the authenticated buyer's reserved/purchased items. Sends the
-  /// Cognito ID token from [Session] so the backend can derive `buyerUserId`
-  /// from the authorizer claims.
-  Future<List<Purchase>> fetchPurchases({int limit = 50}) async {
+  /// Convenience: reserve (24h hold).
+  Future<Map<String, dynamic>> reserveListing(String evaluationId) =>
+      purchaseListing(evaluationId, action: 'RESERVE');
+
+  /// Convenience: buy outright.
+  Future<Map<String, dynamic>> buyListing(String evaluationId) =>
+      purchaseListing(evaluationId, action: 'BUY');
+
+  /// Fetches the authenticated buyer's items, optionally filtered by
+  /// [status] ("SOLD" for My Purchases, "RESERVED" for the Reserved tab).
+  Future<List<Purchase>> fetchPurchases({String? status, int limit = 50}) async {
     final token = Session.idToken;
     final uri = Uri.parse(_purchasesUrl).replace(
+      queryParameters: {
+        'limit': '$limit',
+        if (status != null) 'status': status,
+      },
+    );
+    late http.Response response;
+    try {
+      response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Sign in to view your items.');
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = decoded['purchases'] as List? ?? const [];
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(Purchase.fromJson)
+          .toList();
+    }
+    throw Exception('Failed to load items (${response.statusCode}).');
+  }
+
+  /// Fetches the authenticated user's in-app notifications.
+  Future<NotificationsResult> fetchNotifications({int limit = 50}) async {
+    final token = Session.idToken;
+    final uri = Uri.parse(_notificationsUrl).replace(
       queryParameters: {'limit': '$limit'},
     );
     late http.Response response;
@@ -314,17 +357,20 @@ class GradeRepository {
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw Exception('Sign in to view your purchases.');
+      throw Exception('Sign in to view notifications.');
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final items = decoded['purchases'] as List? ?? const [];
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(Purchase.fromJson)
-          .toList();
+      final items = decoded['notifications'] as List? ?? const [];
+      return NotificationsResult(
+        notifications: items
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromJson)
+            .toList(),
+        unreadCount: (decoded['unreadCount'] as num?)?.toInt() ?? 0,
+      );
     }
-    throw Exception('Failed to load purchases (${response.statusCode}).');
+    throw Exception('Failed to load notifications (${response.statusCode}).');
   }
 }
 

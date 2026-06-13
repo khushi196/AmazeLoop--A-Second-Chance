@@ -18,8 +18,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   final GradeRepository _repo = GradeRepository();
   late Future<ListingDetail> _future;
   int _heroIndex = 0;
-  bool _reserving = false;
-  bool _reserved = false;
+  bool _busy = false;
+  String? _outcome; // null | 'RESERVED' | 'SOLD'
 
   @override
   void initState() {
@@ -458,85 +458,151 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // Buy button (wired to /purchase)
+  // Reserve / Buy actions (wired to /purchase)
   // -------------------------------------------------------------------------
-  Future<void> _handleBuy(String evaluationId) async {
-    // Gate: must be a logged-in customer to reserve.
-    if (!Session.isSignedIn || Session.role != 'customer') {
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Sign in as a customer to reserve this item.')),
-      );
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginView()),
-      );
-      return;
-    }
 
-    setState(() => _reserving = true);
+  /// Returns false and routes to login if the user isn't a signed-in customer.
+  Future<bool> _ensureCustomer(String verb) async {
+    if (Session.isSignedIn && Session.role == 'customer') return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Sign in as a customer to $verb this item.')),
+    );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginView()),
+    );
+    return false;
+  }
+
+  Future<void> _handleReserve(String evaluationId) async {
+    if (!await _ensureCustomer('reserve')) return;
+    setState(() => _busy = true);
     try {
       final result = await _repo.reserveListing(evaluationId);
       if (!mounted) return;
       setState(() {
-        _reserving = false;
-        _reserved = true;
+        _busy = false;
+        _outcome = 'RESERVED';
       });
-      final alreadyReserved = result['alreadyReserved'] == true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green.shade700,
-          content: Text(
-            alreadyReserved
-                ? 'You already reserved this item.'
-                : 'Item reserved successfully.',
-          ),
-        ),
+      final already = result['alreadyReserved'] == true;
+      _snack(
+        already ? 'You already reserved this item.' : 'Item reserved — held for 24h.',
+        Colors.green.shade700,
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _reserving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
+      setState(() => _busy = false);
+      _snack(e.toString().replaceFirst('Exception: ', ''), Colors.red.shade700);
     }
   }
 
+  Future<void> _handleBuy(String evaluationId) async {
+    if (!await _ensureCustomer('buy')) return;
+    setState(() => _busy = true);
+    try {
+      await _repo.buyListing(evaluationId);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _outcome = 'SOLD';
+      });
+      _snack('Purchase confirmed.', Colors.green.shade700);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _snack(e.toString().replaceFirst('Exception: ', ''), Colors.red.shade700);
+    }
+  }
+
+  void _snack(String message, Color bg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(backgroundColor: bg, content: Text(message)),
+    );
+  }
+
   Widget _buildBuyButton(String evaluationId) {
-    final disabled = _reserving || _reserved;
-    final label = _reserved
-        ? 'Reserved'
-        : (_reserving ? 'Reserving…' : 'Reserve / Buy Now');
+    // Terminal states after an action completes.
+    if (_outcome == 'SOLD') {
+      return _statusButton('Purchased', Icons.check_circle, Colors.green.shade600);
+    }
+    if (_outcome == 'RESERVED') {
+      return _statusButton('Reserved (held 24h)', Icons.lock_clock, Colors.grey.shade500);
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: amazonNavy,
+              side: const BorderSide(color: amazonNavy, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: _busy ? null : () => _handleReserve(evaluationId),
+            child: const Text(
+              'Reserve',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: amazonOrange,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: _busy ? null : () => _handleBuy(evaluationId),
+            child: _busy
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  )
+                : const Text(
+                    'Buy Now',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statusButton(String label, IconData icon, Color color) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
+      child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _reserved ? Colors.grey.shade400 : amazonOrange,
+          backgroundColor: color,
           padding: const EdgeInsets.symmetric(vertical: 16),
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: disabled ? null : () => _handleBuy(evaluationId),
-        child: _reserving
-            ? const SizedBox(
-                height: 22,
-                width: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black,
-                ),
-              )
-            : Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+        onPressed: null,
+        icon: Icon(icon, color: Colors.white),
+        label: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

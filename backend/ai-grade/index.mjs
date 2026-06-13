@@ -13,14 +13,17 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
 // ---------------------------------------------------------------------------
 // Configuration & shared clients
 // ---------------------------------------------------------------------------
 const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-lite-v1:0";
+// Best available multimodal model that works without the Anthropic use-case
+// form. Switch to "global.anthropic.claude-opus-4-6-v1" once Anthropic access
+// is granted in the Bedrock console (Model access → Anthropic use case form).
+const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-pro-v1:0";
 const MAX_PHOTOS = 4;
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
@@ -87,15 +90,16 @@ function imageFormatFor(key) {
   return "jpeg";
 }
 
-/** Fetches an S3 object and returns { base64, format } or null on failure. */
-async function fetchImageAsBase64(url) {
+/** Fetches an S3 object and returns { bytes, format } or null on failure.
+ *  Converse expects raw image bytes (Uint8Array), not base64. */
+async function fetchImageBytes(url) {
   const s3ref = parseS3Url(url);
   if (!s3ref) return null;
   try {
     const obj = await s3.send(new GetObjectCommand({ Bucket: s3ref.Bucket, Key: s3ref.Name }));
     const bytes = await obj.Body.transformToByteArray();
     return {
-      base64: Buffer.from(bytes).toString("base64"),
+      bytes,
       format: imageFormatFor(s3ref.Name),
     };
   } catch (e) {
@@ -113,47 +117,45 @@ async function gradeWithVision({ images, productName, category }) {
   if (images.length === 0) return null;
 
   const promptText =
-    `You are a STRICT expert product-condition grader for a recommerce (resale) platform. ` +
-    `Be conservative: when in doubt, grade DOWN, not up. ` +
-    `The photos show a used product${productName ? ` described as "${productName}"` : ""}` +
-    `${category ? ` in the category "${category}"` : ""}. ` +
-    `normalizedPrice is the fair like-new reference price for this exact model; you only decide what fraction of it this specific unit is worth.\n\n` +
-    `Step 1 - decide the condition:\n` +
-    `- "Like New": almost no visible wear.\n` +
-    `- "Good": light wear, minor scuffs, no cracks.\n` +
-    `- "Used": clearly used, noticeable wear, but no major cracks or breaks.\n` +
-    `- "Damaged": ANY cracked or shattered screen, broken glass, major dents, or similar serious issues.\n\n` +
-    `Step 2 - assign:\n` +
-    `- conditionScore: a number between 0 and 1 (1 = perfect, <= 0.25 = very badly damaged).\n` +
-    `- priceMultiplier (fraction of normalizedPrice) within these bands:\n` +
-    `  Like New: 0.8-1.0   Good: 0.6-0.8   Used: 0.4-0.6   Damaged: 0.1-0.3.\n\n` +
-    `HARD RULE: If you see a cracked or shattered screen, broken glass, or multiple major defects, ` +
-    `you MUST choose "Damaged" and set priceMultiplier in the 0.1-0.2 range (severe reduction), closer to 0.1 for severe shattering.\n\n` +
-    `Respond with ONLY a JSON object (no markdown, no extra text):\n` +
-    `{"condition":"<Like New|Good|Used|Damaged>","conditionScore":<0-1>,"priceMultiplier":<fraction>,"reasoning":"<one concise sentence summarizing the main visible issues and why they justify this condition and price reduction>"}`;
+    `You are a STRICT visible physical-condition grader for a recommerce resale platform. ` +
+    `Your only task is to inspect the provided photos and grade the visible physical condition of this specific used item. ` +
+    `Do NOT estimate market price. Do NOT identify premium value. Do NOT decide routing.\n\n` +
+    `The photos show a used product${productName ? ` described as "${productName}"` : ""}${category ? ` in the category "${category}"` : ""}.\n` +
+    `normalizedPrice is the fair like-new reference price for this exact model. You only decide what fraction of normalizedPrice this visible unit is worth.\n\n` +
+    `Be conservative: when in doubt, grade DOWN, not up. Grade only from visible evidence. Do not assume unseen parts are perfect.\n\n` +
+    `Condition definitions:\n` +
+    `- "Like New": almost no visible wear; clean, intact, close to unused; no cracks, dents, tears, stains, heavy scratches, missing parts, or deformation.\n` +
+    `- "Good": light wear only; minor scuffs, small scratches, light creasing, or mild use; no serious damage.\n` +
+    `- "Used": clearly used; noticeable wear, dirt, fading, stains, scratches, creasing, aging, or cosmetic deterioration; still intact and usable.\n` +
+    `- "Damaged": any serious defect, including cracked/shattered glass, broken frame, major dents, torn fabric, holes, missing pieces, detached sole/strap/handle, exposed wiring, severe stains, deformation, or structural damage.\n\n` +
+    `HARD RULES:\n` +
+    `1. If you see cracked glass, shattered screen, broken frame, torn fabric, holes, missing parts, major dents, detached sole, exposed wiring, or structural damage, you MUST choose "Damaged".\n` +
+    `2. If multiple moderate defects are visible, do NOT choose "Good"; choose "Used" or "Damaged".\n` +
+    `3. If photos are blurry, dark, incomplete, or key areas are missing, reduce confidence and grade conservatively.\n` +
+    `4. Brand/model value must not improve condition. A premium product with visible damage is still damaged.\n` +
+    `5. For severe damage, choose "Damaged" and set priceMultiplier between 0.10 and 0.20.\n\n` +
+    `Assign:\n` +
+    `- conditionScore: number between 0 and 1. 1 = perfect, <= 0.25 = very badly damaged.\n` +
+    `- priceMultiplier: fraction of normalizedPrice within the allowed band:\n` +
+    `  Like New: 0.80-1.00\n  Good: 0.60-0.80\n  Used: 0.40-0.60\n  Damaged: 0.10-0.30\n\n` +
+    `Respond with ONLY a JSON object. No markdown. No extra text.\n` +
+    `{"condition": "<Like New|Good|Used|Damaged>","conditionScore": <0-1>,"priceMultiplier": <fraction>,"confidence": <0-1>,"visibleIssues": ["<short visible issue>", "<short visible issue>"],"reasoning": "<one concise sentence explaining the visible evidence and why it justifies the condition and price reduction>"}`;
 
   const content = images.map((img) => ({
-    image: { format: img.format, source: { bytes: img.base64 } },
+    image: { format: img.format, source: { bytes: img.bytes } },
   }));
   content.push({ text: promptText });
-
-  const payload = {
-    messages: [{ role: "user", content }],
-    inferenceConfig: { maxTokens: 300, temperature: 0, topP: 0.1, topK: 1 },
-  };
 
   let raw;
   try {
     const resp = await bedrock.send(
-      new InvokeModelCommand({
+      new ConverseCommand({
         modelId: MODEL_ID,
-        contentType: "application/json",
-        accept: "application/json",
-        body: JSON.stringify(payload),
+        messages: [{ role: "user", content }],
+        inferenceConfig: { maxTokens: 300, temperature: 0, topP: 0.1 },
       })
     );
-    const decoded = JSON.parse(Buffer.from(resp.body).toString("utf-8"));
-    raw = decoded?.output?.message?.content?.[0]?.text ?? "";
+    raw = resp?.output?.message?.content?.[0]?.text ?? "";
   } catch (e) {
     console.error(`Bedrock invoke failed: ${e.message}`);
     return null;
@@ -174,8 +176,27 @@ async function gradeWithVision({ images, productName, category }) {
     let priceMultiplier = Number(parsed.priceMultiplier);
     if (Number.isNaN(priceMultiplier)) priceMultiplier = NaN; // handled by clamping later
 
+    let conditionConfidence = Number(parsed.confidence);
+    conditionConfidence = Number.isNaN(conditionConfidence)
+      ? null
+      : Math.max(0, Math.min(1, conditionConfidence));
+
+    const visibleIssues = Array.isArray(parsed.visibleIssues)
+      ? parsed.visibleIssues
+          .map((s) => String(s).trim())
+          .filter((s) => s.length > 0 && s.length < 160)
+          .slice(0, 8)
+      : [];
+
     const conditionReason = (parsed.reasoning || parsed.reason || "").toString();
-    return { condition, conditionScore, priceMultiplier, conditionReason };
+    return {
+      condition,
+      conditionScore,
+      priceMultiplier,
+      conditionReason,
+      conditionConfidence,
+      visibleIssues,
+    };
   } catch (e) {
     console.error(`Failed to parse model output: ${raw}`);
     return null;
@@ -240,7 +261,7 @@ export const handler = async (event) => {
   // 2. Load the photos from S3
   const images = [];
   for (const url of photoUrls) {
-    const img = await fetchImageAsBase64(url);
+    const img = await fetchImageBytes(url);
     if (img) images.push(img);
   }
 
@@ -252,11 +273,15 @@ export const handler = async (event) => {
   });
 
   let condition, conditionReason, conditionScore, priceMultiplier;
+  let conditionConfidence = null;
+  let visibleIssues = [];
   if (graded) {
     condition = graded.condition;
     conditionReason = graded.conditionReason || `Graded "${graded.condition}" from photo analysis.`;
     conditionScore = graded.conditionScore;
     priceMultiplier = graded.priceMultiplier;
+    conditionConfidence = graded.conditionConfidence ?? null;
+    visibleIssues = Array.isArray(graded.visibleIssues) ? graded.visibleIssues : [];
   } else {
     // No usable photos or model failure — neutral default.
     condition = "Used";
@@ -276,23 +301,38 @@ export const handler = async (event) => {
 
   // 6. Write results back to the same Evaluations record
   try {
-    const updateExpr = bestPhotoIndex != null
-      ? "SET #cond = :c, conditionReason = :cr, conditionScore = :cs, priceMultiplier = :pm, estimatedResaleValue = :erv, bestPhotoIndex = :bpi"
-      : "SET #cond = :c, conditionReason = :cr, conditionScore = :cs, priceMultiplier = :pm, estimatedResaleValue = :erv";
+    // Build the update expression dynamically so optional fields are only
+    // written when we actually have them.
+    const setParts = [
+      "#cond = :c",
+      "conditionReason = :cr",
+      "conditionScore = :cs",
+      "priceMultiplier = :pm",
+      "estimatedResaleValue = :erv",
+      "visibleIssues = :vi",
+    ];
     const exprVals = {
       ":c": condition,
       ":cr": conditionReason,
       ":cs": conditionScore,
       ":pm": appliedMultiplier,
       ":erv": estimatedResaleValue,
+      ":vi": visibleIssues,
     };
-    if (bestPhotoIndex != null) exprVals[":bpi"] = bestPhotoIndex;
+    if (bestPhotoIndex != null) {
+      setParts.push("bestPhotoIndex = :bpi");
+      exprVals[":bpi"] = bestPhotoIndex;
+    }
+    if (conditionConfidence != null) {
+      setParts.push("conditionConfidence = :cc");
+      exprVals[":cc"] = conditionConfidence;
+    }
 
     await ddb.send(
       new UpdateCommand({
         TableName: EVALUATIONS_TABLE,
         Key: { evaluationId },
-        UpdateExpression: updateExpr,
+        UpdateExpression: "SET " + setParts.join(", "),
         ExpressionAttributeNames: { "#cond": "condition" },
         ExpressionAttributeValues: exprVals,
       })
@@ -307,6 +347,8 @@ export const handler = async (event) => {
     condition,
     conditionReason,
     conditionScore,
+    conditionConfidence,
+    visibleIssues,
     priceMultiplier: appliedMultiplier,
     estimatedResaleValue,
     bestPhotoIndex,

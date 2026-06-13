@@ -7,7 +7,7 @@
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, ScanCommand, QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
@@ -18,7 +18,10 @@ const REGION = process.env.AWS_REGION || "ap-south-1";
 const CATALOG_TABLE = process.env.CATALOG_TABLE || "ProductsCatalog";
 const CATALOG_ORDER_INDEX = process.env.CATALOG_ORDER_INDEX || "orderId-index";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-lite-v1:0";
+// Best available multimodal model that works without the Anthropic use-case
+// form. Switch to "global.anthropic.claude-opus-4-6-v1" once Anthropic access
+// is granted in the Bedrock console.
+const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-pro-v1:0";
 
 const ddbClient = new DynamoDBClient({ region: REGION });
 const ddb = DynamoDBDocumentClient.from(ddbClient);
@@ -86,7 +89,7 @@ function parseS3Url(url) {
   return null;
 }
 
-/** Fetch the first photo from S3 and return { base64, format } or null. */
+/** Fetch the first photo from S3 and return { bytes, format } or null. */
 async function fetchFirstPhoto(photoUrls) {
   if (!Array.isArray(photoUrls) || photoUrls.length === 0) return null;
   const ref = parseS3Url(photoUrls[0]);
@@ -96,7 +99,7 @@ async function fetchFirstPhoto(photoUrls) {
     const bytes = await obj.Body.transformToByteArray();
     const ext = ref.Name.toLowerCase();
     const format = ext.endsWith(".png") ? "png" : ext.endsWith(".webp") ? "webp" : "jpeg";
-    return { base64: Buffer.from(bytes).toString("base64"), format };
+    return { bytes, format };
   } catch (e) {
     console.error(`Grade LLM: failed to fetch photo: ${e.message}`);
     return null;
@@ -114,46 +117,81 @@ async function estimatePriceWithLLM({ productName, category, reportedPrice, cata
       catalogSamples.map(s => `- ${s.title} (${s.category}): Rs.${s.originalPrice}`).join("\n")
     : "No catalog reference products available.";
 
+  // Load a photo first so the prompt can truthfully say whether one is present.
+  const photo = await fetchFirstPhoto(photoUrls);
+
   const promptText =
-    `You are a product pricing expert for an Indian recommerce (resale) platform.\n` +
-    `${photoUrls && photoUrls.length > 0 ? "Look at the product photo provided." : "No photo available."}\n` +
-    `Product name entered by user: "${productName || "unknown"}" (category: "${category || "unknown"}").\n` +
+    `You are a STRICT product pricing expert for an Indian recommerce resale platform. ` +
+    `Your task is to estimate the fair LIKE-NEW reference price in INR for the exact product model or closest identifiable model. ` +
+    `Do NOT grade condition. Do NOT decide routing.\n\n` +
+    `${photo ? "Look at the product photo provided and use visual evidence to identify the product." : "No photo is available, so rely only on text and catalog references."}\n` +
+    `Product name entered by user: "${productName || "unknown"}".\n` +
+    `Category: "${category || "unknown"}".\n` +
     `User entered price: Rs.${reportedPrice}.\n\n` +
     `${samplesText}\n\n` +
-    `Based on VISUAL identification of the product (if photo is provided) AND typical Indian market prices, ` +
-    `estimate a fair LIKE-NEW reference price in INR for this specific product model. ` +
-    `Be realistic — budget shoes cost Rs.500-3000, mid-range Rs.3000-8000, premium Rs.8000-20000. ` +
-    `If the user's entered price seems reasonable, keep it. If it seems wrong (too high or too low), correct it.\n\n` +
-    `Respond with ONLY valid JSON, no markdown:\n` +
-    `{"estimatedPrice": <integer in INR>, "reasoning": "<one sentence identifying the product and justifying the price>"}`;
-
-  // Try to load a photo for visual context
-  const photo = await fetchFirstPhoto(photoUrls);
+    `STRICT MODEL-MATCHING RULES:\n` +
+    `1. Price the exact or closest identifiable model, not the broad product type.\n` +
+    `2. A broad category match is weak evidence. For example, do NOT price all shoes similarly: one shoe may be Rs.600 and another may be Rs.25,000.\n` +
+    `3. Prefer evidence in this order:\n` +
+    `   - exact same brand + model/series + variant/specs\n` +
+    `   - same brand + close model/series/tier\n` +
+    `   - same visible quality tier\n` +
+    `   - broad category only as last resort\n` +
+    `4. If the exact model is unclear, do NOT invent a premium model. Use a conservative estimate and lower confidence. ` +
+    `However, if the user text clearly contains a well-known brand + model/series, such as "Dell XPS 13", "iPhone 13", "Sony WH-1000XM4", "Nike Air Force 1", or "Adidas Ultraboost", ` +
+    `treat that as at least a "strong" model match even without a photo, unless the category or catalog evidence contradicts it. ` +
+    `Do not downgrade a clear brand+model text match to "category_only" just because no photo is available.\n` +
+    `5. User-entered price is weak evidence. Keep it only if it matches the identified model and realistic Indian market pricing.\n` +
+    `6. Ignore catalog references that only share the category but differ in brand/model/tier.\n` +
+    `7. Premium/luxury pricing is allowed only when brand/model evidence clearly supports it.\n\n` +
+    `modelMatchLevel definitions:\n` +
+    `- "exact": same brand + exact model/series + variant/specs are clearly known from photo, text, or catalog.\n` +
+    `- "strong": brand + model/series are clearly known, but variant/specs/year/storage/size are uncertain.\n` +
+    `- "partial": brand or product line is known, but exact model is uncertain.\n` +
+    `- "category_only": only broad product type is known, such as "shoe", "laptop", "phone", or "bag".\n` +
+    `- "unclear": product identity is too ambiguous to price reliably.\n\n` +
+    `HARD PRICING GUARD: If modelMatchLevel is "exact" or "strong", price according to the realistic market tier for that model. ` +
+    `Do not force a budget/category-average estimate merely because the input is text-only.\n\n` +
+    `Indian pricing guidance:\n` +
+    `- Budget footwear/clothing/accessories: usually Rs.300-3000.\n` +
+    `- Mid-range branded items: usually Rs.3000-10000.\n` +
+    `- Premium/special-edition items: usually Rs.10000-25000 only with strong model evidence.\n` +
+    `- Electronics/appliances must be priced by exact model, generation, storage/specs, and tier.\n\n` +
+    `Return ONLY valid JSON. No markdown. No extra text.\n` +
+    `{"estimatedPrice": <integer in INR>,"identifiedProduct": "<brand + model/series + variant if known, or unclear>","modelMatchLevel": "<exact|strong|partial|category_only|unclear>","confidence": <0-1>,"reasoning": "<one sentence explaining the model evidence and why this like-new price is realistic>"}`;
 
   const content = [];
   if (photo) {
-    content.push({ image: { format: photo.format, source: { bytes: photo.base64 } } });
+    content.push({ image: { format: photo.format, source: { bytes: photo.bytes } } });
   }
   content.push({ text: promptText });
 
   try {
-    const resp = await bedrock.send(new InvokeModelCommand({
+    const resp = await bedrock.send(new ConverseCommand({
       modelId: MODEL_ID,
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({
-        messages: [{ role: "user", content }],
-        inferenceConfig: { maxTokens: 200, temperature: 0, topP: 0.1, topK: 1 },
-      }),
+      messages: [{ role: "user", content }],
+      inferenceConfig: { maxTokens: 250, temperature: 0, topP: 0.1 },
     }));
-    const decoded = JSON.parse(Buffer.from(resp.body).toString("utf-8"));
-    const raw = decoded?.output?.message?.content?.[0]?.text ?? "";
+    const raw = resp?.output?.message?.content?.[0]?.text ?? "";
     const match = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match ? match[0] : raw);
     const price = Number(parsed.estimatedPrice);
     if (Number.isNaN(price) || price <= 0) return null;
-    console.log(`LLM vision price estimate: Rs.${price} — ${parsed.reasoning}`);
-    return { estimatedPrice: Math.round(price / 10) * 10, reasoning: parsed.reasoning || "" };
+    const identifiedProduct = (parsed.identifiedProduct || "").toString();
+    const modelMatchLevel = (parsed.modelMatchLevel || "").toString();
+    let confidence = Number(parsed.confidence);
+    confidence = Number.isNaN(confidence) ? null : Math.max(0, Math.min(1, confidence));
+    console.log(
+      `LLM price estimate: Rs.${price} [match=${modelMatchLevel || "n/a"}, conf=${confidence ?? "n/a"}] ` +
+      `${identifiedProduct || "unclear"} — ${parsed.reasoning || ""}`
+    );
+    return {
+      estimatedPrice: Math.round(price / 10) * 10,
+      reasoning: parsed.reasoning || "",
+      identifiedProduct,
+      modelMatchLevel,
+      confidence,
+    };
   } catch (e) {
     console.error(`LLM price estimation failed: ${e.message}`);
     return null;

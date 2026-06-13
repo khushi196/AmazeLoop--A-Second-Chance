@@ -128,10 +128,17 @@ function circularImpactKg(category) {
 }
 
 function buildHealthCard(item) {
+  // Prefer the structured visibleIssues array from AI grading; fall back to
+  // splitting the one-sentence conditionReason for older records.
+  const issues = Array.isArray(item.visibleIssues) && item.visibleIssues.length > 0
+    ? item.visibleIssues.map((s) => String(s).trim()).filter((s) => s.length > 0)
+    : deriveIssues(item.conditionReason);
+
   return {
     condition: item.condition || null,
     conditionScore: item.conditionScore ?? null,
-    issues: deriveIssues(item.conditionReason),
+    conditionConfidence: item.conditionConfidence ?? null,
+    issues,
     conditionReason: item.conditionReason || null,
     routeReason: item.routeReason || null,
     finalDisposition: item.chosenDisposition || item.finalDisposition || null,

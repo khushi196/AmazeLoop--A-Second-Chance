@@ -69,9 +69,27 @@ function riskBand(reason, condition) {
 /** Determines whether a record should appear on the marketplace. */
 function isListable(item) {
   if (item.status !== "ROUTED") return false;
-  if (item.buyerUserId) return false; // hide items already reserved/bought
   const effective = item.chosenDisposition || item.finalDisposition;
-  return effective === "Resell";
+  if (effective !== "Resell") return false;
+
+  // No buyer at all → listable.
+  if (!item.buyerUserId) return true;
+
+  // SOLD items never come back.
+  if (item.purchaseStatus === "SOLD") return false;
+
+  // RESERVED: only hide while the hold is still active. Expired holds are
+  // treated as available again (the sweep Lambda also resets them, but this
+  // keeps the marketplace correct even between sweeps).
+  if (item.purchaseStatus === "RESERVED") {
+    if (item.reservationExpiresAt &&
+        new Date(item.reservationExpiresAt) < new Date()) {
+      return true;
+    }
+    return false;
+  }
+
+  return false;
 }
 
 /** Projects an Evaluation row into the buyer-facing listing shape. */

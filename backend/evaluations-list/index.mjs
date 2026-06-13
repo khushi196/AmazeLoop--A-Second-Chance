@@ -90,6 +90,8 @@ export const handler = async (event) => {
     estimatedResaleValue: it.estimatedResaleValue,
     nearestWarehouseId: it.nearestWarehouseId,
     status: it.status,
+    purchaseStatus: it.purchaseStatus ?? null,
+    buyerUserId: it.buyerUserId ?? null,
     photoUrls: it.photoUrls,
     bestPhotoIndex: it.bestPhotoIndex,
   }));

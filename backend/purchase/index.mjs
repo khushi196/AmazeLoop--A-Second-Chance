@@ -1,21 +1,21 @@
 /**
  * AmazeLoopPurchaseFunction  (POST /purchase)
  *
- * Buyer-side reservation/purchase flow. Marks an evaluation as reserved by
- * the authenticated buyer so it disappears from the marketplace and
- * appears in that buyer's "My Purchases" list.
+ * Buyer-side reserve / buy flow. Two actions:
+ *   - RESERVE: holds the item for 24h (purchaseStatus = RESERVED,
+ *     reservationExpiresAt = now + 24h). It leaves the marketplace and
+ *     appears in the buyer's "Reserved" tab.
+ *   - BUY: completes the purchase (purchaseStatus = SOLD). It leaves the
+ *     marketplace permanently and appears in "My Purchases". A buyer can
+ *     BUY a fresh item directly, or convert their own active reservation.
  *
- * Identity is taken from the Cognito authorizer claims (sub) so the buyer
- * cannot impersonate another user via the request body. Falls back to a
- * `buyerUserId` body field only when no authorizer is attached, which
- * keeps local testing simple but should be removed once the authorizer
- * is enforced in production.
+ * Identity comes from the Cognito authorizer claims (sub) so a buyer cannot
+ * impersonate another user via the body.
  *
- * Concurrency safety: the UpdateItem uses a conditional expression so
- * two buyers tapping "Buy" simultaneously can't both win — the second
- * write fails with ConditionalCheckFailedException and we return 409.
+ * Concurrency safety: writes use a conditional expression so two buyers
+ * can't both claim the same available item.
  *
- * Request:  { "evaluationId": "EVAL-..." }
+ * Request:  { "evaluationId": "EVAL-...", "action": "RESERVE" | "BUY" }
  */
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -23,10 +23,14 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   UpdateCommand,
+  PutCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 
 const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
+const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE || "AmazeLoopNotifications";
+const RESERVATION_HOURS = Number(process.env.RESERVATION_HOURS || 24);
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 
@@ -43,8 +47,30 @@ function response(statusCode, body) {
   };
 }
 
+/** Best-effort notification write — never fails the purchase if this errors. */
+async function notify(userId, type, title, bodyText, evaluationId) {
+  try {
+    await ddb.send(
+      new PutCommand({
+        TableName: NOTIFICATIONS_TABLE,
+        Item: {
+          userId,
+          createdAt: new Date().toISOString(),
+          notificationId: `NOTIF-${randomUUID()}`,
+          type,
+          title,
+          body: bodyText,
+          evaluationId: evaluationId || null,
+          read: false,
+        },
+      })
+    );
+  } catch (e) {
+    console.error(`notify failed: ${e.message}`);
+  }
+}
+
 export const handler = async (event) => {
-  // CORS preflight (in case API Gateway forwards OPTIONS to the integration)
   if (
     event?.requestContext?.http?.method === "OPTIONS" ||
     event?.httpMethod === "OPTIONS"
@@ -52,7 +78,6 @@ export const handler = async (event) => {
     return response(204, {});
   }
 
-  // Parse body
   let body;
   try {
     body =
@@ -68,18 +93,20 @@ export const handler = async (event) => {
     return response(400, { error: "evaluationId is required." });
   }
 
-  // Pull buyerUserId from the Cognito authorizer (REST or HTTP API shapes),
-  // falling back to the request body only when no authorizer is configured.
+  const action = (body.action || "RESERVE").toUpperCase();
+  if (action !== "RESERVE" && action !== "BUY") {
+    return response(400, { error: "action must be RESERVE or BUY." });
+  }
+
   const restClaims = event?.requestContext?.authorizer?.claims;
   const httpClaims = event?.requestContext?.authorizer?.jwt?.claims;
   const claims = restClaims || httpClaims || {};
   const buyerUserId = claims.sub || body.buyerUserId;
-
   if (!buyerUserId) {
     return response(401, { error: "Missing buyer identity. Authentication required." });
   }
 
-  // 1. Fetch the evaluation so we can validate it's actually purchasable
+  // 1. Fetch the evaluation
   let item;
   try {
     const result = await ddb.send(
@@ -93,39 +120,136 @@ export const handler = async (event) => {
     return response(404, { error: "Evaluation not found." });
   }
 
-  // 2. Validation rules
   const effectiveDisposition = item.chosenDisposition || item.finalDisposition;
   if (item.status !== "ROUTED" || effectiveDisposition !== "Resell") {
-    return response(400, { error: "This item is not available for purchase." });
+    return response(400, { error: "This item is not available." });
   }
-  if (item.buyerUserId) {
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const title = item.productName || "your item";
+
+  // Determine current ownership, treating an expired reservation as free.
+  const reservedByOther =
+    item.buyerUserId && item.buyerUserId !== buyerUserId;
+  const reservationExpired =
+    item.purchaseStatus === "RESERVED" &&
+    item.reservationExpiresAt &&
+    new Date(item.reservationExpiresAt) < now;
+  const alreadySold = item.purchaseStatus === "SOLD";
+
+  if (alreadySold) {
     if (item.buyerUserId === buyerUserId) {
-      // Idempotent: same buyer re-tapping returns the existing reservation.
       return response(200, {
         evaluationId,
         buyerUserId,
-        purchaseStatus: item.purchaseStatus || "RESERVED",
-        purchaseTimestamp: item.purchaseTimestamp || null,
-        alreadyReserved: true,
+        purchaseStatus: "SOLD",
+        alreadyOwned: true,
       });
     }
-    return response(409, { error: "This item has already been reserved." });
+    return response(409, { error: "This item has already been sold." });
+  }
+  if (reservedByOther && !reservationExpired) {
+    return response(409, { error: "This item is currently reserved by another buyer." });
   }
 
-  // 3. Conditional update — only succeed if no other buyer has claimed it.
-  const purchaseTimestamp = new Date().toISOString();
+  const ownActiveReservation =
+    item.buyerUserId === buyerUserId &&
+    item.purchaseStatus === "RESERVED" &&
+    !reservationExpired;
+
+  // -------------------------------------------------------------------------
+  // BUY
+  // -------------------------------------------------------------------------
+  if (action === "BUY") {
+    try {
+      await ddb.send(
+        new UpdateCommand({
+          TableName: EVALUATIONS_TABLE,
+          Key: { evaluationId },
+          UpdateExpression:
+            "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t REMOVE reservationExpiresAt",
+          // Succeed if the item is free, OR already reserved by this buyer.
+          ConditionExpression:
+            "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR purchaseStatus <> :sold",
+          ExpressionAttributeValues: {
+            ":b": buyerUserId,
+            ":ps": "SOLD",
+            ":t": nowIso,
+            ":sold": "SOLD",
+          },
+        })
+      );
+    } catch (e) {
+      if (e.name === "ConditionalCheckFailedException") {
+        return response(409, { error: "This item is no longer available." });
+      }
+      return response(500, { error: "Failed to complete purchase.", detail: e.message });
+    }
+
+    await notify(
+      buyerUserId,
+      "PURCHASE",
+      "Purchase confirmed",
+      `Your purchase of "${title}" is confirmed.`,
+      evaluationId
+    );
+
+    // Notify the seller too — but only if we're not the seller ourselves.
+    if (item.userId && item.userId !== buyerUserId) {
+      await notify(
+        item.userId,
+        "ITEM_SOLD",
+        "Your item was bought",
+        `Your listed "${title}" has been bought.`,
+        evaluationId
+      );
+    }
+
+    return response(200, {
+      evaluationId,
+      buyerUserId,
+      purchaseStatus: "SOLD",
+      purchaseTimestamp: nowIso,
+      converted: ownActiveReservation,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // RESERVE
+  // -------------------------------------------------------------------------
+  if (ownActiveReservation) {
+    // Idempotent: re-reserving your own active hold just returns it.
+    return response(200, {
+      evaluationId,
+      buyerUserId,
+      purchaseStatus: "RESERVED",
+      purchaseTimestamp: item.purchaseTimestamp || null,
+      reservationExpiresAt: item.reservationExpiresAt,
+      alreadyReserved: true,
+    });
+  }
+
+  const expiresAt = new Date(
+    now.getTime() + RESERVATION_HOURS * 60 * 60 * 1000
+  ).toISOString();
+
   try {
     await ddb.send(
       new UpdateCommand({
         TableName: EVALUATIONS_TABLE,
         Key: { evaluationId },
         UpdateExpression:
-          "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t",
-        ConditionExpression: "attribute_not_exists(buyerUserId)",
+          "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t, reservationExpiresAt = :exp",
+        // Free item, or our own (possibly expired) reservation.
+        ConditionExpression:
+          "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR reservationExpiresAt < :now",
         ExpressionAttributeValues: {
           ":b": buyerUserId,
           ":ps": "RESERVED",
-          ":t": purchaseTimestamp,
+          ":t": nowIso,
+          ":exp": expiresAt,
+          ":now": nowIso,
         },
       })
     );
@@ -136,10 +260,31 @@ export const handler = async (event) => {
     return response(500, { error: "Failed to reserve item.", detail: e.message });
   }
 
+  await notify(
+    buyerUserId,
+    "RESERVATION",
+    "Item reserved",
+    `You reserved "${title}". It's held for ${RESERVATION_HOURS}h — buy it before it expires.`,
+    evaluationId
+  );
+
+  // Notify the seller that someone is holding their item — only if we're
+  // not the seller ourselves.
+  if (item.userId && item.userId !== buyerUserId) {
+    await notify(
+      item.userId,
+      "ITEM_RESERVED",
+      "Your item was reserved",
+      `A buyer reserved your listed "${title}". They have ${RESERVATION_HOURS}h to complete the purchase.`,
+      evaluationId
+    );
+  }
+
   return response(200, {
     evaluationId,
     buyerUserId,
     purchaseStatus: "RESERVED",
-    purchaseTimestamp,
+    purchaseTimestamp: nowIso,
+    reservationExpiresAt: expiresAt,
   });
 };

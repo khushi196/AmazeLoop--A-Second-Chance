@@ -25,6 +25,11 @@ class _HistoryViewState extends State<HistoryView> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final evals = await _repo.listEvaluations(
         userId: Session.userId,
@@ -58,6 +63,42 @@ class _HistoryViewState extends State<HistoryView> {
     }
   }
 
+  /// Marketplace status for an evaluation, from the seller's perspective.
+  /// Only items routed for Resale are listable; Recycle/Refurbish items never
+  /// reach the marketplace, so they show their disposition instead.
+  ({String label, Color fg, Color bg}) _marketplaceStatus(Map<String, dynamic> ev) {
+    final disposition = (ev['chosenDisposition'] ?? ev['finalDisposition'])?.toString();
+    final status = ev['status']?.toString();
+    final purchaseStatus = ev['purchaseStatus']?.toString();
+
+    // Not yet routed → nothing to show.
+    if (status != 'ROUTED') {
+      return (label: 'Pending', fg: Colors.grey.shade600, bg: Colors.grey.shade100);
+    }
+
+    // Recycle / Refurbish items are never listed on the marketplace.
+    if (disposition == 'Recycle') {
+      return (label: 'Recycled', fg: Colors.red.shade700, bg: Colors.red.shade50);
+    }
+    if (disposition == 'Refurbish') {
+      return (label: 'Refurbishing', fg: Colors.purple.shade700, bg: Colors.purple.shade50);
+    }
+
+    // Resell → track buy / reserve state.
+    if (disposition == 'Resell') {
+      switch (purchaseStatus) {
+        case 'SOLD':
+          return (label: 'Bought', fg: Colors.green.shade800, bg: Colors.green.shade50);
+        case 'RESERVED':
+          return (label: 'Reserved', fg: Colors.amber.shade900, bg: Colors.amber.shade50);
+        default:
+          return (label: 'Listed · not bought', fg: Colors.blue.shade800, bg: Colors.blue.shade50);
+      }
+    }
+
+    return (label: 'Not listed', fg: Colors.grey.shade600, bg: Colors.grey.shade100);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,11 +112,32 @@ class _HistoryViewState extends State<HistoryView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Grading History',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F1111), letterSpacing: -0.5)),
-                const SizedBox(height: 8),
-                Text('View all previously graded items and their routing dispositions.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Grading History',
+                              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F1111), letterSpacing: -0.5)),
+                          const SizedBox(height: 8),
+                          Text('View all previously graded items and their routing dispositions.',
+                              style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _load,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Refresh'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF9900),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 32),
                 if (_loading)
                   const Center(child: CircularProgressIndicator(color: Color(0xFFFF9900)))
@@ -125,6 +187,7 @@ class _HistoryViewState extends State<HistoryView> {
               DataColumn(label: Text('ROUTE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
               DataColumn(label: Text('RESALE VALUE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
               DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+              DataColumn(label: Text('MARKETPLACE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
               DataColumn(label: Text('ACTION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
             ],
             rows: _evaluations.map((ev) {
@@ -157,6 +220,19 @@ class _HistoryViewState extends State<HistoryView> {
                     ),
                     child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: status == 'ROUTED' ? Colors.green.shade800 : Colors.grey.shade600)),
                   ),
+                ),
+                DataCell(
+                  Builder(builder: (_) {
+                    final m = _marketplaceStatus(ev);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: m.bg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(m.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: m.fg)),
+                    );
+                  }),
                 ),
                 DataCell(
                   TextButton(

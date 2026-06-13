@@ -9,6 +9,7 @@ class Purchase {
   final String? coverImage;
   final String purchaseStatus;
   final DateTime? purchaseTimestamp;
+  final DateTime? reservationExpiresAt;
 
   const Purchase({
     required this.evaluationId,
@@ -19,6 +20,7 @@ class Purchase {
     this.coverImage,
     required this.purchaseStatus,
     this.purchaseTimestamp,
+    this.reservationExpiresAt,
   });
 
   factory Purchase.fromJson(Map<String, dynamic> json) {
@@ -31,6 +33,7 @@ class Purchase {
       coverImage: json['coverImage'] as String?,
       purchaseStatus: (json['purchaseStatus'] ?? 'RESERVED').toString(),
       purchaseTimestamp: _parseDate(json['purchaseTimestamp']),
+      reservationExpiresAt: _parseDate(json['reservationExpiresAt']),
     );
   }
 
