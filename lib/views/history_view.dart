@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/repositories/grade_repository.dart';
+import '../data/route_helpers.dart';
 import '../data/session.dart';
 import 'health_card_view.dart';
 import '../data/models/evaluation_input.dart';
@@ -82,6 +83,14 @@ class _HistoryViewState extends State<HistoryView> {
     }
     if (disposition == 'Refurbish') {
       return (label: 'Refurbishing', fg: Colors.purple.shade700, bg: Colors.purple.shade50);
+    }
+    if (disposition == 'ReturnToOrigin') {
+      // Internal logistics state — never listed on the marketplace.
+      // Customers see the safe label, warehouse operators see the real one.
+      final label = Session.role == 'customer'
+          ? 'Processing'
+          : 'Returned to origin';
+      return (label: label, fg: Colors.indigo.shade700, bg: Colors.indigo.shade50);
     }
 
     // Resell → track buy / reserve state.
@@ -197,6 +206,7 @@ class _HistoryViewState extends State<HistoryView> {
               final dateLabel = createdAt.length >= 10 ? createdAt.substring(0, 10) : createdAt;
               final resale = ev['estimatedResaleValue'];
               final disposition = ev['chosenDisposition'] ?? ev['finalDisposition'] ?? '—';
+              final dispositionLabel = getPublicDispositionLabel(disposition.toString(), Session.role);
               final status = ev['status']?.toString() ?? 'PENDING';
 
               return DataRow(cells: [
@@ -209,7 +219,7 @@ class _HistoryViewState extends State<HistoryView> {
                     child: Text(condition ?? '—', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                DataCell(Text(disposition, style: const TextStyle(fontSize: 13))),
+                DataCell(Text(dispositionLabel, style: const TextStyle(fontSize: 13))),
                 DataCell(Text(resale != null ? '₹${(resale as num).toStringAsFixed(0)}' : '—', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
                 DataCell(
                   Container(

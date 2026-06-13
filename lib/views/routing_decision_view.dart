@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
+import '../data/route_helpers.dart';
+import '../data/session.dart';
 import 'health_card_view.dart';
 
 class RoutingDecisionView extends StatefulWidget {
@@ -22,11 +24,48 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
   bool _overrideMode = false;
   bool _confirming = false;
 
-  static const _options = [
-    {'key': 'Resell', 'title': 'Resell', 'desc': 'Immediate listing on Amazon Renewed.', 'icon': Icons.storefront},
-    {'key': 'Refurbish', 'title': 'Refurbish', 'desc': 'Minor repair at regional facility.', 'icon': Icons.build_circle_outlined},
-    {'key': 'Recycle', 'title': 'Recycle', 'desc': 'Responsible e-waste disposal.', 'icon': Icons.recycling},
-  ];
+  static const _optionMeta = {
+    'ReturnToOrigin': {
+      'title': 'Return to Origin',
+      'desc': 'Send back to the originating warehouse / fulfilment centre.',
+      'icon': Icons.assignment_return_outlined,
+    },
+    'Resell': {
+      'key': 'Resell',
+      'title': 'Resell',
+      'desc': 'Immediate listing on Amazon Renewed.',
+      'icon': Icons.storefront,
+    },
+    'Refurbish': {
+      'key': 'Refurbish',
+      'title': 'Refurbish',
+      'desc': 'Minor repair at regional facility.',
+      'icon': Icons.build_circle_outlined,
+    },
+    'Recycle': {
+      'key': 'Recycle',
+      'title': 'Recycle',
+      'desc': 'Responsible e-waste disposal.',
+      'icon': Icons.recycling,
+    },
+  };
+
+  /// The route options visible to the current user, derived from role + item.
+  /// Customers always see Resell/Refurbish/Recycle. Warehouse operators get
+  /// ReturnToOrigin too when the item came from a customer return AND the
+  /// origin warehouse is reachable.
+  List<Map<String, dynamic>> get _options {
+    final e = widget.evaluation;
+    final eligibility = deriveRouteEligibility(
+      reason: e?.reason,
+      sortingQueue: e?.sortingQueue,
+      nearestWarehouseId: e?.nearestWarehouseId,
+    );
+    final keys = getVisibleRoutes(Session.role, eligibility);
+    return keys
+        .map((k) => {'key': k, ...?_optionMeta[k]})
+        .toList(growable: false);
+  }
 
   @override
   void initState() {

@@ -170,7 +170,7 @@ async function estimatePriceWithLLM({ productName, category, reportedPrice, cata
     const resp = await bedrock.send(new ConverseCommand({
       modelId: MODEL_ID,
       messages: [{ role: "user", content }],
-      inferenceConfig: { maxTokens: 250, temperature: 0, topP: 0.1 },
+      inferenceConfig: { maxTokens: 250, temperature: 0.15, topP: 0.1 },
     }));
     const raw = resp?.output?.message?.content?.[0]?.text ?? "";
     const match = raw.match(/\{[\s\S]*\}/);

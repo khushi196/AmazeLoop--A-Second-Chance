@@ -81,8 +81,23 @@ function parseS3Url(url) {
   return null;
 }
 
-/** Maps a file key to a Nova-supported image format string. */
-function imageFormatFor(key) {
+/** Maps a file key to a Nova-supported image format string, with a byte-level
+ *  fallback so renamed files (e.g. .jpg but actually AVIF) are caught early. */
+function imageFormatFor(key, firstBytes) {
+  // Magic-byte detection takes priority over extension.
+  if (firstBytes && firstBytes.length >= 12) {
+    const h = firstBytes;
+    // JPEG: FF D8 FF
+    if (h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF) return "jpeg";
+    // PNG: 89 50 4E 47
+    if (h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4E && h[3] === 0x47) return "png";
+    // WebP: RIFF????WEBP
+    if (h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46 &&
+        h[8] === 0x57 && h[9] === 0x45 && h[10] === 0x42 && h[11] === 0x50) return "webp";
+    // GIF87a / GIF89a
+    if (h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46) return "gif";
+  }
+  // Extension fallback.
   const lower = key.toLowerCase();
   if (lower.endsWith(".png")) return "png";
   if (lower.endsWith(".webp")) return "webp";
@@ -98,10 +113,12 @@ async function fetchImageBytes(url) {
   try {
     const obj = await s3.send(new GetObjectCommand({ Bucket: s3ref.Bucket, Key: s3ref.Name }));
     const bytes = await obj.Body.transformToByteArray();
-    return {
-      bytes,
-      format: imageFormatFor(s3ref.Name),
-    };
+    const format = imageFormatFor(s3ref.Name, bytes.slice(0, 12));
+    if (format === null) {
+      console.warn(`Unsupported image format for ${s3ref.Name} — skipping.`);
+      return null;
+    }
+    return { bytes, format };
   } catch (e) {
     console.error(`Failed to fetch image ${url}: ${e.message}`);
     return null;
@@ -117,29 +134,38 @@ async function gradeWithVision({ images, productName, category }) {
   if (images.length === 0) return null;
 
   const promptText =
-    `You are a STRICT visible physical-condition grader for a recommerce resale platform. ` +
-    `Your only task is to inspect the provided photos and grade the visible physical condition of this specific used item. ` +
+    `You are a precise visible physical-condition grader for a recommerce resale platform. ` +
+    `Your only task is to inspect the provided photos and grade the visible physical condition of this specific item. ` +
     `Do NOT estimate market price. Do NOT identify premium value. Do NOT decide routing.\n\n` +
-    `The photos show a used product${productName ? ` described as "${productName}"` : ""}${category ? ` in the category "${category}"` : ""}.\n` +
+    `The photos show a product${productName ? ` described as "${productName}"` : ""}${category ? ` in the category "${category}"` : ""}.\n` +
     `normalizedPrice is the fair like-new reference price for this exact model. You only decide what fraction of normalizedPrice this visible unit is worth.\n\n` +
-    `Be conservative: when in doubt, grade DOWN, not up. Grade only from visible evidence. Do not assume unseen parts are perfect.\n\n` +
-    `Condition definitions:\n` +
-    `- "Like New": almost no visible wear; clean, intact, close to unused; no cracks, dents, tears, stains, heavy scratches, missing parts, or deformation.\n` +
+    `GRADING RULES — read carefully, all rules apply:\n\n` +
+    `RULE A — LIKE NEW (positive signals, grade UP if present):\n` +
+    `If you clearly see ANY of the following, you MUST grade "Like New" (score 0.90-1.00):\n` +
+    `- Original sealed or unopened packaging with intact seals/shrink wrap.\n` +
+    `- Tags, labels, or stickers clearly still attached and unremoved.\n` +
+    `- Factory protective film still on screen or body.\n` +
+    `- Zero visible wear, scratches, scuffs, creasing, stains, or marks.\n` +
+    `- Accessories or manuals still in original bags/boxes.\n` +
+    `Do NOT let "be conservative" override these clear Like-New signals. If the item looks genuinely unused, grade it "Like New".\n\n` +
+    `Condition definitions (apply only after checking Rule A above):\n` +
+    `- "Like New": virtually no visible wear; clean, intact, close to unused; no cracks, dents, tears, stains, scratches, missing parts, or deformation. Includes items that appear genuinely unused even without original packaging.\n` +
     `- "Good": light wear only; minor scuffs, small scratches, light creasing, or mild use; no serious damage.\n` +
     `- "Used": clearly used; noticeable wear, dirt, fading, stains, scratches, creasing, aging, or cosmetic deterioration; still intact and usable.\n` +
     `- "Damaged": any serious defect, including cracked/shattered glass, broken frame, major dents, torn fabric, holes, missing pieces, detached sole/strap/handle, exposed wiring, severe stains, deformation, or structural damage.\n\n` +
-    `HARD RULES:\n` +
+    `RULE B — DAMAGE (hard override, grade DOWN if present):\n` +
     `1. If you see cracked glass, shattered screen, broken frame, torn fabric, holes, missing parts, major dents, detached sole, exposed wiring, or structural damage, you MUST choose "Damaged".\n` +
     `2. If multiple moderate defects are visible, do NOT choose "Good"; choose "Used" or "Damaged".\n` +
-    `3. If photos are blurry, dark, incomplete, or key areas are missing, reduce confidence and grade conservatively.\n` +
-    `4. Brand/model value must not improve condition. A premium product with visible damage is still damaged.\n` +
-    `5. For severe damage, choose "Damaged" and set priceMultiplier between 0.10 and 0.20.\n\n` +
+    `3. Brand/model value must not improve condition. A premium product with visible damage is still Damaged.\n` +
+    `4. For severe damage, choose "Damaged" and set priceMultiplier between 0.10 and 0.20.\n\n` +
+    `RULE C — PHOTO QUALITY:\n` +
+    `If photos are blurry, dark, incomplete, or key areas are missing, reduce confidence (set confidence <= 0.6) but do not automatically downgrade condition if what IS visible looks clean.\n\n` +
     `Assign:\n` +
     `- conditionScore: number between 0 and 1. 1 = perfect, <= 0.25 = very badly damaged.\n` +
     `- priceMultiplier: fraction of normalizedPrice within the allowed band:\n` +
     `  Like New: 0.80-1.00\n  Good: 0.60-0.80\n  Used: 0.40-0.60\n  Damaged: 0.10-0.30\n\n` +
     `Respond with ONLY a JSON object. No markdown. No extra text.\n` +
-    `{"condition": "<Like New|Good|Used|Damaged>","conditionScore": <0-1>,"priceMultiplier": <fraction>,"confidence": <0-1>,"visibleIssues": ["<short visible issue>", "<short visible issue>"],"reasoning": "<one concise sentence explaining the visible evidence and why it justifies the condition and price reduction>"}`;
+    `{"condition": "<Like New|Good|Used|Damaged>","conditionScore": <0-1>,"priceMultiplier": <fraction>,"confidence": <0-1>,"visibleIssues": ["<short visible issue>"],"reasoning": "<one concise sentence explaining what you saw and why it justifies this condition>"}`;
 
   const content = images.map((img) => ({
     image: { format: img.format, source: { bytes: img.bytes } },
@@ -152,7 +178,7 @@ async function gradeWithVision({ images, productName, category }) {
       new ConverseCommand({
         modelId: MODEL_ID,
         messages: [{ role: "user", content }],
-        inferenceConfig: { maxTokens: 300, temperature: 0, topP: 0.1 },
+        inferenceConfig: { maxTokens: 300, temperature: 0.15, topP: 0.1 },
       })
     );
     raw = resp?.output?.message?.content?.[0]?.text ?? "";

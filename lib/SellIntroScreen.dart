@@ -106,7 +106,19 @@ class SellIntroScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    // "Maybe later" takes the seller directly to their History
+                    // tab so they can review past evaluations instead of
+                    // dropping back to the login/intro screen.
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DashboardLayout(
+                          startOnHistory: true,
+                        ),
+                      ),
+                    );
+                  },
                   child: const Text(
                     'Maybe later',
                     style: TextStyle(color: amazonNavy),

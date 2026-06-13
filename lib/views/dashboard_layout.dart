@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'submit_item_view.dart';
 import 'history_view.dart';
+import '../RoleSelectionScreen.dart';
+import '../data/session.dart';
 
 class DashboardLayout extends StatefulWidget {
-  const DashboardLayout({super.key});
+  /// When true the dashboard opens on the History tab instead of Grade New Item.
+  /// Used by SellIntroScreen's "Maybe later" button.
+  final bool startOnHistory;
+  const DashboardLayout({super.key, this.startOnHistory = false});
 
   @override
   State<DashboardLayout> createState() => _DashboardLayoutState();
 }
 
 class _DashboardLayoutState extends State<DashboardLayout> {
-  int _selectedIndex = 0;
-  Widget? _currentCustomView; // Holds screens like Grading Result, Routing, etc.
+  late int _selectedIndex = widget.startOnHistory ? 1 : 0;
+  Widget? _currentCustomView;
 
   // A method to swap the main content area from any child screen
   void _changeView(Widget newView) {
@@ -65,7 +71,19 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                 _buildNavItem(1, 'History', Icons.history),
                 const Spacer(),
                 InkWell(
-                  onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                  onTap: () async {
+                    try {
+                      await Amplify.Auth.signOut();
+                    } catch (_) {}
+                    Session.clear();
+                    if (!context.mounted) return;
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const RoleSelectionScreen()),
+                      (route) => false,
+                    );
+                  },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                     child: Row(

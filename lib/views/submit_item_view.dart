@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
@@ -69,14 +71,33 @@ class _SubmitItemViewState extends State<SubmitItemView> {
     setState(() => _isGrading = true);
 
     try {
-      // 1. Upload all selected photos to S3 in parallel and collect their URLs
+      // 1. Upload all selected photos to S3 in parallel and collect their URLs.
+      //    We force-encode every image to JPEG before uploading because:
+      //    - Browsers (Chrome) often pick AVIF/HEIC from the gallery.
+      //    - Amazon Bedrock Nova only accepts jpeg, png, webp, gif.
+      //    The image package decodes any format and re-encodes to JPEG.
       final List<String> photoUrls = await Future.wait(
         List.generate(_selectedImages.length, (i) async {
-          final image = _selectedImages[i];
-          final bytes = await image.readAsBytes();
+          final xfile = _selectedImages[i];
+          final rawBytes = await xfile.readAsBytes();
+
+          // Decode → re-encode as JPEG (lossless path if already JPEG/PNG).
+          Uint8List uploadBytes;
+          try {
+            final decoded = img.decodeImage(rawBytes);
+            if (decoded != null) {
+              uploadBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 90));
+            } else {
+              uploadBytes = rawBytes; // fallback: send as-is
+            }
+          } catch (_) {
+            uploadBytes = rawBytes; // decode failure: send as-is
+          }
+
+          // Always tell S3 + Bedrock it's JPEG so the content-type matches.
           return _gradeRepository.uploadPhoto(
-            bytes: bytes,
-            fileName: image.name.isNotEmpty ? image.name : 'photo_$i.jpg',
+            bytes: uploadBytes,
+            fileName: 'photo_$i.jpg',
             contentType: 'image/jpeg',
           );
         }),

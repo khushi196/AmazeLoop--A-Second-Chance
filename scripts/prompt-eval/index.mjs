@@ -150,7 +150,7 @@ function scoreRoute({ netValue, conditionScore, confidence, routeFit, costBurden
   return n * 0.45 + conditionScore * 0.25 + confidence * 0.15 + routeFit * 0.15 - cp * 0.20;
 }
 
-const REFURB = { "Like New":{m:1.0,n:"none",r:false}, "Good":{m:0.85,n:"cleaning",r:true},
+const REFURB = { "Like New":{m:null,n:"none",r:false}, "Good":{m:0.85,n:"cleaning",r:true},
   "Used":{m:0.75,n:"minor_repair",r:true}, "Damaged":{m:0.6,n:"major_repair",r:null} };
 const BLOCKER = /crack|shatter|broken|torn|hole|missing|detached|exposed wiring|major dent|unsafe/i;
 
@@ -158,7 +158,7 @@ function decideRoute(r) {
   const { condition, conditionScore, confidence = 1, normalizedPrice, priceMultiplier,
     distanceKm, visibleIssues = [] } = r;
   const prof = REFURB[condition] || REFURB["Used"];
-  const postRefurbMultiplier = Math.max(prof.m, priceMultiplier);
+  const postRefurbMultiplier = prof.m == null ? priceMultiplier : Math.max(prof.m, priceMultiplier);
   const hasBlocker = visibleIssues.some((i) => BLOCKER.test(String(i)));
   const repairable = condition === "Damaged" ? !hasBlocker : prof.r === true;
   const needed = prof.n;
@@ -191,6 +191,30 @@ function decideRouteDynamic(x) {
   const minP = 300;
   const severe = x.condition === "Damaged" && x.repairable !== true;
   const blockers = (x.visibleIssues || []).some((i) => BLOCKER.test(String(i)));
+
+  // ReturnToOrigin (warehouse-only) — net-profit gate.
+  const originNet =
+    (x.originRecoveryValue || 0) -
+    (x.originTransportCost || 0) -
+    (x.localHandlingCost || 0) -
+    (x.originRestockingFee || 0) -
+    (x.delayRiskBuffer || 0);
+  const returnEligible =
+    x.isWarehouseFlow === true &&
+    x.sourceType === "customer_return" &&
+    x.originWarehouseAvailable === true &&
+    x.sellerAcceptsReturn === true &&
+    (x.condition === "Like New" || x.condition === "Good") &&
+    x.conditionScore >= 0.7 &&
+    (x.confidence ?? 1) >= 0.65 &&
+    x.refurbishmentNeeded !== "major_repair" &&
+    !blockers &&
+    originNet >= minP &&
+    originNet >= directNet * 1.10 &&
+    originNet >= refurbNet * 1.10 &&
+    originNet >= recycleNet;
+  if (returnEligible) return "ReturnToOrigin";
+
   const dEl = !severe && !blockers && x.conditionScore >= 0.45 && directNet >= minP;
   const rEl = x.repairable === true && x.refurbishmentNeeded !== "none" && x.repairCost <= postRefurb * 0.25 && uplift >= refurbCost * 1.2 && refurbNet >= minP;
   const dS = dEl ? scoreRoute({ netValue: directNet, conditionScore: x.conditionScore, confidence: x.confidence, routeFit: (x.condition==="Like New"||x.condition==="Good")?1:0.75, costBurden: directCost/Math.max(asIs,1) }) : -Infinity;

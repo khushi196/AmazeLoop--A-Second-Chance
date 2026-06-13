@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'constants.dart';
+import 'RoleSelectionScreen.dart';
 import 'MarketplaceTab.dart';
 import 'ReservedTab.dart';
 import 'PurchasesTab.dart';
 import 'NotificationsTab.dart';
+import 'data/session.dart';
 
 /// Top-level shell for buyers and guest browsers. The Sell / Trade-in flow
 /// lives behind the entry screen, not in this dashboard.
@@ -89,24 +92,64 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
 
                 const Spacer(),
 
-                InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_back, color: Colors.grey),
-                        SizedBox(width: 16),
-                        Text(
-                          'Switch Role',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
+                // When the user is a signed-in buyer, show an account/logout button.
+                // When they are a guest (no token), show "Switch Role" so they can
+                // navigate back to the entry screen.
+                if (Session.isSignedIn)
+                  InkWell(
+                    onTap: () async {
+                      try {
+                        await Amplify.Auth.signOut();
+                      } catch (_) {}
+                      Session.clear();
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RoleSelectionScreen()),
+                        (route) => false,
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 24),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.logout, color: Colors.grey),
+                          SizedBox(width: 16),
+                          Text(
+                            'Logout',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  InkWell(
+                    onTap: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RoleSelectionScreen()),
+                        (route) => false,
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 24),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.arrow_back, color: Colors.grey),
+                          SizedBox(width: 16),
+                          Text(
+                            'Switch Role',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

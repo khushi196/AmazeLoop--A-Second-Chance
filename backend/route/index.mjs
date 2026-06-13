@@ -149,6 +149,16 @@ function decideRouteDynamic({
   sortingCost,
   recyclingTransportCost,
   recycleRecoveryValue,
+  // Origin-return inputs (warehouse-only path).
+  isWarehouseFlow = false,
+  sourceType, // "customer_return" | "consumer_trade_in" | ...
+  originWarehouseAvailable = false,
+  sellerAcceptsReturn = false,
+  originRecoveryValue = 0,
+  originTransportCost = 0,
+  localHandlingCost = 0,
+  originRestockingFee = 0,
+  delayRiskBuffer = 0,
   minimumProfitThreshold = 300,
 }) {
   const asIsResaleValue = normalizedPrice * priceMultiplier;
@@ -169,6 +179,34 @@ function decideRouteDynamic({
   const hasDirectResaleBlockers = visibleIssues.some((issue) =>
     /crack|shatter|broken|torn|hole|missing|detached|exposed wiring|major dent|unsafe/i.test(issue)
   );
+
+  // -------------------------------------------------------------------------
+  // ReturnToOrigin (warehouse-only): take this path early when the economics
+  // genuinely favour bouncing the item back to the origin/seller warehouse.
+  // -------------------------------------------------------------------------
+  const originReturnNet =
+    originRecoveryValue -
+    originTransportCost -
+    localHandlingCost -
+    originRestockingFee -
+    delayRiskBuffer;
+
+  const returnToOriginEligible =
+    isWarehouseFlow &&
+    sourceType === "customer_return" &&
+    originWarehouseAvailable === true &&
+    sellerAcceptsReturn === true &&
+    (condition === "Like New" || condition === "Good") &&
+    conditionScore >= 0.7 &&
+    confidence >= 0.65 &&
+    refurbishmentNeeded !== "major_repair" &&
+    !hasDirectResaleBlockers &&
+    originReturnNet >= minimumProfitThreshold &&
+    originReturnNet >= directResellNet * 1.10 &&
+    originReturnNet >= refurbishNet * 1.10 &&
+    originReturnNet >= recycleNet;
+
+  if (returnToOriginEligible) return "ReturnToOrigin";
 
   const directEligible =
     !hasSevereDamage &&
@@ -245,15 +283,24 @@ const COST = {
   platformRiskRate: 0.05, // 5% of as-is resale value
   refurbRiskRate: 0.08,   // 8% of post-refurb resale value
   recycleRecoveryRate: 0.05, // scrap/parts value ~5% of normalized price
+  // Origin-return economics (warehouse-only path).
+  originRecoveryRate: 0.90,        // origin warehouse credits ~90% of like-new price for clean returns
+  originTransportBase: 100,
+  originTransportPerKm: 1.5,       // a bit more than local pickup — origin distance is uncertain
+  originRestockingRate: 0.05,      // 5% of recovery value
+  delayRiskRate: 0.05,             // 5% of recovery value (rejection/delay buffer)
 };
 
 // How much value a refurbished unit can recover (fraction of normalizedPrice),
-// and what level of work each condition needs.
+// and what level of work each condition needs. `mult: null` means "no
+// refurbishment is meaningful for this condition" (Like-New is already at
+// peak value); the calculator falls back to priceMultiplier so the refurb
+// path doesn't get spurious value uplift.
 const REFURB_PROFILE = {
-  "Like New": { mult: 1.0, needed: "none", repairable: false },
+  "Like New": { mult: null, needed: "none", repairable: false },
   "Good":     { mult: 0.85, needed: "cleaning", repairable: true },
   "Used":     { mult: 0.75, needed: "minor_repair", repairable: true },
-  "Damaged":  { mult: 0.6,  needed: "major_repair", repairable: null }, // repairable decided by blockers
+  "Damaged":  { mult: 0.6,  needed: "major_repair", repairable: null },
 };
 
 const STRUCTURAL_BLOCKER =
@@ -276,7 +323,11 @@ function buildEconomics(r) {
   }
 
   const profile = REFURB_PROFILE[condition] || REFURB_PROFILE["Used"];
-  const postRefurbMultiplier = Math.max(profile.mult, priceMultiplier);
+  // For Like-New (mult=null) refurbishment is a no-op; keep postRefurb at the
+  // current as-is multiplier so the refurb path doesn't inflate.
+  const postRefurbMultiplier = profile.mult == null
+      ? priceMultiplier
+      : Math.max(profile.mult, priceMultiplier);
 
   // Damaged is repairable only when there are no structural blockers.
   const hasBlocker = visibleIssues.some((i) => STRUCTURAL_BLOCKER.test(String(i)));
@@ -290,7 +341,37 @@ function buildEconomics(r) {
     refurbishmentNeeded === "cleaning" ? 0.02 : 0;
   const repairCost = Math.round(normalizedPrice * repairRate);
 
+  // -------------------------------------------------------------------------
+  // ReturnToOrigin inputs (warehouse-only path)
+  // -------------------------------------------------------------------------
+  // The origin warehouse recovers the item at its ACTUAL condition value, not
+  // a fraction of the like-new reference price. Using estimatedResaleValue as
+  // the base means a genuinely Like-New item gets a high recovery value even
+  // if normalizedPrice was underestimated by the LLM/catalog fallback.
   const asIsResaleValue = normalizedPrice * priceMultiplier;
+  const originBaseValue = Math.max(asIsResaleValue, normalizedPrice * COST.originRecoveryRate);
+  // A clean item (condition Like New / Good) commands a higher recovery rate
+  // from origin since they can resell it themselves.
+  const isHighQuality = condition === "Like New" || condition === "Good";
+  const recoveryRate = isHighQuality ? COST.originRecoveryRate : COST.originRecoveryRate * 0.7;
+  const originRecoveryValue = Math.round(asIsResaleValue * recoveryRate);
+
+  const isWarehouseFlow = r.userRole === "warehouse";
+  const sourceType =
+    r.reason === "Returned Amazon order" || r.sortingQueue === "LOGISTICS_OPTIMIZATION_QUEUE"
+      ? "customer_return"
+      : "consumer_trade_in";
+  const originWarehouseAvailable =
+    !!r.nearestWarehouseId && r.nearestWarehouseId.length > 0;
+  const sellerAcceptsReturn = true;
+
+  const originTransportCost = Math.round(
+    COST.originTransportBase + COST.originTransportPerKm * distanceKm
+  );
+  const localHandlingCost = COST.qcCost + COST.sortingCost;
+  const originRestockingFee = Math.round(originRecoveryValue * COST.originRestockingRate);
+  const delayRiskBuffer = Math.round(originRecoveryValue * COST.delayRiskRate);
+
   const postRefurbResaleValue = normalizedPrice * postRefurbMultiplier;
 
   return {
@@ -315,11 +396,22 @@ function buildEconomics(r) {
     sortingCost: COST.sortingCost,
     recyclingTransportCost: Math.round(COST.recycleTransportBase + COST.recycleTransportPerKm * distanceKm),
     recycleRecoveryValue: Math.round(normalizedPrice * COST.recycleRecoveryRate),
+    // Origin-return inputs
+    isWarehouseFlow,
+    sourceType,
+    originWarehouseAvailable,
+    sellerAcceptsReturn,
+    originRecoveryValue,
+    originTransportCost,
+    localHandlingCost,
+    originRestockingFee,
+    delayRiskBuffer,
   };
 }
 
 /** Maps a final disposition + queue into the operator-facing route label. */
 function recommendedRouteFor(disposition, sortingQueue) {
+  if (disposition === "ReturnToOrigin") return "Return to origin warehouse";
   if (disposition === "Recycle") return "Recycle / parts harvesting at nearest warehouse";
   if (disposition === "Refurbish") return "Send to nearest warehouse for refurbishment";
   // Resell
@@ -446,6 +538,8 @@ export const handler = async (event) => {
     pincode: item.currentPincode ?? null,
     category: item.category ?? null,
     productName: item.productName ?? null,
+    userRole: item.userRole ?? null,
+    reason: item.reason ?? null,
   };
 
   // 3. Compute the nearest warehouse + distance from the user's pincode
