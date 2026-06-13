@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/evaluation_input.dart';
+import '../models/listing.dart';
+import '../models/listing_detail.dart';
+import '../models/purchase.dart';
 import '../session.dart';
 
 /// Talks to the real AmazeLoop backend (API Gateway).
@@ -15,6 +18,9 @@ class GradeRepository {
   static const String _routeUrl = '$_baseUrl/route';
   static const String _routeConfirmUrl = '$_baseUrl/route/confirm';
   static const String _evaluationsUrl = '$_baseUrl/evaluations';
+  static const String _listingsUrl = '$_baseUrl/listings';
+  static const String _purchaseUrl = '$_baseUrl/purchase';
+  static const String _purchasesUrl = '$_baseUrl/purchases';
 
   /// Uploads a single image to S3 via a presigned URL and returns the public
   /// object URL (to be stored as a photoUrl on the evaluation).
@@ -206,6 +212,119 @@ class GradeRepository {
     } else {
       throw Exception('Failed to load history (${response.statusCode}).');
     }
+  }
+
+  /// Fetches the public marketplace feed of items routed for resale.
+  Future<List<Listing>> fetchListings({int limit = 50}) async {
+    final uri = Uri.parse(_listingsUrl).replace(
+      queryParameters: {'limit': '$limit'},
+    );
+    late http.Response response;
+    try {
+      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = decoded['listings'] as List? ?? const [];
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(Listing.fromJson)
+          .toList();
+    } else {
+      throw Exception('Failed to load listings (${response.statusCode}).');
+    }
+  }
+
+  /// Fetches the full detail (listing + images + health card) for a listing.
+  Future<ListingDetail> fetchListingDetail(String listingId) async {
+    final uri = Uri.parse('$_listingsUrl/${Uri.encodeComponent(listingId)}');
+    late http.Response response;
+    try {
+      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    if (response.statusCode == 404) {
+      throw Exception('Listing not found.');
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return ListingDetail.fromJson(decoded);
+    }
+    throw Exception('Failed to load listing detail (${response.statusCode}).');
+  }
+
+  /// Reserves a listing for the currently authenticated buyer. Sends the
+  /// Cognito ID token from [Session] as a Bearer token so API Gateway's
+  /// Cognito authorizer can identify the buyer.
+  ///
+  /// Returns the parsed response body (e.g. { evaluationId, buyerUserId,
+  /// purchaseStatus, purchaseTimestamp, alreadyReserved? }).
+  Future<Map<String, dynamic>> reserveListing(String evaluationId) async {
+    final token = Session.idToken;
+    late http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse(_purchaseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'evaluationId': evaluationId}),
+      );
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    Map<String, dynamic> decoded = const {};
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      // Fall through — status code drives the result.
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    final message = decoded['error']?.toString() ??
+        'Failed to reserve listing (${response.statusCode}).';
+    throw Exception(message);
+  }
+
+  /// Fetches the authenticated buyer's reserved/purchased items. Sends the
+  /// Cognito ID token from [Session] so the backend can derive `buyerUserId`
+  /// from the authorizer claims.
+  Future<List<Purchase>> fetchPurchases({int limit = 50}) async {
+    final token = Session.idToken;
+    final uri = Uri.parse(_purchasesUrl).replace(
+      queryParameters: {'limit': '$limit'},
+    );
+    late http.Response response;
+    try {
+      response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Sign in to view your purchases.');
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = decoded['purchases'] as List? ?? const [];
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(Purchase.fromJson)
+          .toList();
+    }
+    throw Exception('Failed to load purchases (${response.statusCode}).');
   }
 }
 

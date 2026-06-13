@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'BuyerDashboard.dart';
-import 'views/login_view.dart'; // Imports your AWS login
+import 'SellerTypeScreen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({Key? key}) : super(key: key);
@@ -69,7 +69,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginView()),
+                    MaterialPageRoute(builder: (context) => const SellerTypeScreen()),
                   );
                 },
               ),

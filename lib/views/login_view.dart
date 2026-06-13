@@ -1,16 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+import '../BuyerDashboard.dart';
+import '../SellIntroScreen.dart';
 import '../data/session.dart';
 
+/// Where the user came from. Used to decide what role to assign on signup
+/// (so they don't have to pick) and where to send them after a successful
+/// login.
+enum LoginEntry {
+  /// Reached from a buy/reserve gate or the marketplace navbar; default role
+  /// is `customer` and post-login lands at the buyer dashboard.
+  buyer,
+
+  /// Reached from `Sell / Trade-in → Individual seller`; role is locked to
+  /// `customer` and post-login lands at the customer Sell Intro screen.
+  customerSell,
+
+  /// Reached from `Sell / Trade-in → Warehouse`; role is locked to
+  /// `warehouse` and post-login lands at the warehouse dashboard.
+  warehouseSell,
+}
+
 class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+  final LoginEntry entry;
+  const LoginView({super.key, this.entry = LoginEntry.buyer});
 
   @override
   State<LoginView> createState() => _LoginViewState();
 }
 
 class _LoginViewState extends State<LoginView> {
-  String _selectedRole = 'warehouse'; // Default role selection
+  late final String _selectedRole = _initialRole();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String? _message;
@@ -18,6 +39,16 @@ class _LoginViewState extends State<LoginView> {
   bool _isLoginLoading = false;
   bool _isSignUpLoading = false;
   final TextEditingController _codeController = TextEditingController();
+
+  String _initialRole() {
+    switch (widget.entry) {
+      case LoginEntry.warehouseSell:
+        return 'warehouse';
+      case LoginEntry.customerSell:
+      case LoginEntry.buyer:
+        return 'customer';
+    }
+  }
 
   @override
   void dispose() {
@@ -108,23 +139,13 @@ class _LoginViewState extends State<LoginView> {
       );
 
       if (result.isSignedIn) {
-        // Fetch user attributes
-        final attributes = await Amplify.Auth.fetchUserAttributes();
-
-        for (final attr in attributes) {
-          if (attr.userAttributeKey.key == 'sub') {
-            Session.userId = attr.value;
-          }
-          if (attr.userAttributeKey.key == 'custom:role') {
-            Session.role = attr.value;
-          }
-        }
+        await _populateSession();
 
         // Load grading history for this user
         await _loadHistory(Session.userId!);
 
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          _routeByRole();
         }
       } else if (result.nextStep.signInStep == AuthSignInStep.confirmSignUp) {
         // User exists but hasn't confirmed their email yet — trigger verification flow
@@ -164,6 +185,77 @@ class _LoginViewState extends State<LoginView> {
   /// Body will be implemented when the history backend is ready.
   Future<void> _loadHistory(String userId) async {
     // TODO: Fetch grading history from backend for this userId
+  }
+
+  /// Reads user attributes (sub, custom:role) and the Cognito ID token from
+  /// the current Amplify session, and stores them on [Session].
+  Future<void> _populateSession() async {
+    // 1. User attributes give us sub + custom:role.
+    try {
+      final attributes = await Amplify.Auth.fetchUserAttributes();
+      for (final attr in attributes) {
+        if (attr.userAttributeKey.key == 'sub') {
+          Session.userId = attr.value;
+        }
+        if (attr.userAttributeKey.key == 'custom:role') {
+          Session.role = attr.value;
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchUserAttributes failed: $e');
+    }
+    // Default to 'customer' so the role is never null downstream.
+    Session.role ??= 'customer';
+
+    // 2. Auth session gives us the raw JWT for API authorization.
+    try {
+      final session = await Amplify.Auth.fetchAuthSession();
+      if (session is CognitoAuthSession) {
+        final tokens = session.userPoolTokensResult.value;
+        Session.idToken = tokens.idToken.raw;
+      }
+    } catch (e) {
+      // Token capture is best-effort; unauthenticated endpoints still work.
+      debugPrint('fetchAuthSession failed: $e');
+    }
+  }
+
+  /// After a successful login, sends the user to the screen appropriate
+  /// for their entry path and role, and clears the navigation stack so
+  /// back-button can't drop them back into the login form.
+  void _routeByRole() {
+    Widget destination;
+    switch (widget.entry) {
+      case LoginEntry.warehouseSell:
+        // Warehouse path: always end at the seller dashboard.
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/dashboard',
+          (route) => false,
+        );
+        return;
+      case LoginEntry.customerSell:
+        // Customer "I want to sell" path: end at the Sell Intro.
+        destination = const SellIntroScreen();
+        break;
+      case LoginEntry.buyer:
+        // Marketplace gate / general buyer path: route by stored role.
+        if (Session.role == 'warehouse') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/dashboard',
+            (route) => false,
+          );
+          return;
+        }
+        destination = const BuyerDashboard();
+        break;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+      (route) => false,
+    );
   }
 
   /// Shows a dialog prompting the user for their email verification code.
@@ -259,27 +351,14 @@ class _LoginViewState extends State<LoginView> {
                             password: password,
                           );
                           if (signInResult.isSignedIn) {
-                            // Fetch user attributes
-                            final attributes =
-                                await Amplify.Auth.fetchUserAttributes();
-                            for (final attr in attributes) {
-                              if (attr.userAttributeKey.key == 'sub') {
-                                Session.userId = attr.value;
-                              }
-                              if (attr.userAttributeKey.key == 'custom:role') {
-                                Session.role = attr.value;
-                              }
-                            }
+                            await _populateSession();
                             await _loadHistory(Session.userId!);
 
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
                             }
                             if (mounted) {
-                              Navigator.pushReplacementNamed(
-                                this.context,
-                                '/dashboard',
-                              );
+                              _routeByRole();
                             }
                             return;
                           } else {
@@ -702,29 +781,8 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Role Selection
-                    Text(
-                      'I AM A:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildRoleCard(
-                            'Warehouse / Seller',
-                            'warehouse',
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildRoleCard('Customer', 'customer')),
-                      ],
-                    ),
+                    // Role banner (locked by entry path — no toggle)
+                    _buildRoleBanner(),
                     const SizedBox(height: 40),
                     const Divider(),
                     const SizedBox(height: 32),
@@ -845,52 +903,50 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  // Helper widget to keep the Role Selection code clean
-  Widget _buildRoleCard(String title, String value) {
-    final isSelected = _selectedRole == value;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedRole = value;
-        });
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFF9900).withValues(alpha: 0.05)
-              : Colors.grey.shade50,
-          border: Border.all(
-            color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: isSelected
-                  ? const Color(0xFFFF9900)
-                  : Colors.grey.shade400,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: const Color(0xFF111111),
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 14,
+  // Read-only banner that tells the user which role they'll sign up under.
+  // The role is determined by the entry path (Sell / Trade-in → Individual
+  // vs Warehouse, or Buyer gate), not by an in-form toggle.
+  Widget _buildRoleBanner() {
+    final isWarehouse = _selectedRole == 'warehouse';
+    final label = isWarehouse ? 'Warehouse / Seller' : 'Customer';
+    final icon = isWarehouse ? Icons.warehouse_outlined : Icons.person_outline;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: const Color(0xFF232F3E)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SIGNING IN AS',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF111111),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
