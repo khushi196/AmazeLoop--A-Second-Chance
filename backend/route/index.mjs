@@ -120,6 +120,14 @@ function decideRoute(r) {
   const veryLowValue = normalizedPrice > 0 && resaleValue < 0.15 * normalizedPrice;
   const distanceReasonable = distanceKm == null || distanceKm <= REASONABLE_DISTANCE_KM;
 
+  // HARD RULE: Damaged items always go to Recycle — no resale pathway.
+  if (condition === "Damaged") {
+    return {
+      recommendedRoute: "Recycle / parts harvesting at nearest warehouse",
+      finalDisposition: "Recycle",
+    };
+  }
+
   // --- recommendedRoute ---
   let recommendedRoute;
   if (r.sortingQueue === "LOGISTICS_OPTIMIZATION_QUEUE") {
@@ -136,7 +144,7 @@ function decideRoute(r) {
     } else if (condition === "Used" && distanceReasonable && !veryLowValue) {
       recommendedRoute = "Local marketplace / C2C resale via nearest warehouse";
     } else {
-      // Damaged, or very low resale value
+      // Used with very low value or unreasonable distance → Recycle
       recommendedRoute = "Recycle / parts harvesting at nearest warehouse";
     }
   } else {
@@ -150,9 +158,10 @@ function decideRoute(r) {
   let finalDisposition;
   if (condition === "Like New" || (condition === "Good" && conditionScore >= 0.8)) {
     finalDisposition = "Resell";
-  } else if (condition === "Good" || condition === "Used") {
+  } else if (condition === "Good" || (condition === "Used" && !veryLowValue && distanceReasonable)) {
     finalDisposition = "Refurbish";
   } else {
+    // Used with very low value / bad distance, or any other case
     finalDisposition = "Recycle";
   }
 

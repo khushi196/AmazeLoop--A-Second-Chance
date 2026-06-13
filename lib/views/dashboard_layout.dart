@@ -37,7 +37,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     } else {
       mainContent = _selectedIndex == 0 
           ? SubmitItemView(onNavigate: _changeView, onFinishToHistory: _goToHistory) 
-          : HistoryView(onNavigate: _changeView);
+          : HistoryView(key: UniqueKey(), onNavigate: _changeView);
     }
 
     return Scaffold(

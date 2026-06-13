@@ -27,9 +27,13 @@ function response(statusCode, body) {
 
 export const handler = async (event) => {
   const params = event.queryStringParameters || {};
-  const userId = params.userId;
   const warehouseId = params.warehouseId;
   const limit = Math.min(Number(params.limit) || 20, 50);
+
+  // Prefer userId from Cognito authorizer claims if present (prevents IDOR),
+  // otherwise fall back to the query param (API Gateway has no authorizer yet).
+  const claims = event.requestContext?.authorizer?.claims || {};
+  const userId = claims.sub || params.userId;
 
   if (!userId && !warehouseId) {
     return response(400, { error: "userId or warehouseId query parameter is required." });
@@ -77,11 +81,14 @@ export const handler = async (event) => {
     evaluationId: it.evaluationId,
     createdAt: it.createdAt,
     productName: it.productName,
+    category: it.category,
     condition: it.condition,
+    conditionReason: it.conditionReason,
     finalDisposition: it.finalDisposition,
     chosenDisposition: it.chosenDisposition,
     recommendedRoute: it.recommendedRoute,
     estimatedResaleValue: it.estimatedResaleValue,
+    nearestWarehouseId: it.nearestWarehouseId,
     status: it.status,
     photoUrls: it.photoUrls,
     bestPhotoIndex: it.bestPhotoIndex,

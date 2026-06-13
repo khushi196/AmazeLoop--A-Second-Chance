@@ -215,12 +215,14 @@ class AiGradeResult {
   final String condition;
   final String conditionReason;
   final num estimatedResaleValue;
+  final int? bestPhotoIndex;
 
   AiGradeResult({
     required this.evaluationId,
     required this.condition,
     required this.conditionReason,
     required this.estimatedResaleValue,
+    this.bestPhotoIndex,
   });
 
   factory AiGradeResult.fromJson(Map<String, dynamic> json) {
@@ -229,6 +231,7 @@ class AiGradeResult {
       condition: json['condition']?.toString() ?? 'Unknown',
       conditionReason: json['conditionReason']?.toString() ?? '',
       estimatedResaleValue: (json['estimatedResaleValue'] as num?) ?? 0,
+      bestPhotoIndex: json['bestPhotoIndex'] as int?,
     );
   }
 }

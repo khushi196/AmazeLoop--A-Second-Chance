@@ -28,7 +28,6 @@ class _HistoryViewState extends State<HistoryView> {
     try {
       final evals = await _repo.listEvaluations(
         userId: Session.userId,
-        warehouseId: Session.role == 'warehouse' ? null : null, // use warehouse filter if needed
       );
       if (!mounted) return;
       setState(() {
@@ -163,14 +162,20 @@ class _HistoryViewState extends State<HistoryView> {
                   TextButton(
                     onPressed: () {
                       if (widget.onNavigate != null) {
+                        final photos = (ev['photoUrls'] as List?)?.map((e) => e.toString()).toList();
                         final e = EvaluationInput(
                           evaluationId: ev['evaluationId']?.toString(),
                           productName: ev['productName']?.toString(),
+                          category: ev['category']?.toString(),
                           condition: condition,
+                          conditionReason: ev['conditionReason']?.toString(),
                           estimatedResaleValue: resale as num?,
                           finalDisposition: ev['finalDisposition']?.toString(),
                           chosenDisposition: ev['chosenDisposition']?.toString(),
                           recommendedRoute: ev['recommendedRoute']?.toString(),
+                          nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
+                          photoUrls: photos,
+                          bestPhotoIndex: ev['bestPhotoIndex'] as int?,
                         );
                         widget.onNavigate!(HealthCardView(onNavigate: widget.onNavigate, evaluation: e));
                       }

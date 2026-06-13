@@ -10,7 +10,7 @@ class GradingResultView extends StatelessWidget {
   const GradingResultView({super.key, this.onNavigate, this.evaluation, this.onFinishToHistory});
 
   String _formatPrice(num? value, String currency) {
-    if (value == null) return '—';
+    if (value == null || value == 0) return 'N/A — Recycle';
     final symbol = currency == 'INR' ? '₹' : '$currency ';
     return '$symbol${value.toStringAsFixed(0)}';
   }

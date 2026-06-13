@@ -9,8 +9,16 @@ class HealthCardView extends StatelessWidget {
   final EvaluationInput? evaluation;
   const HealthCardView({super.key, this.onNavigate, this.evaluation, this.onFinishToHistory});
 
+  /// Gets the hero photo URL using bestPhotoIndex, falling back to the first photo.
+  String? _heroPhotoUrl(EvaluationInput? e) {
+    if (e == null || e.photoUrls == null || e.photoUrls!.isEmpty) return null;
+    final idx = e.bestPhotoIndex ?? 0;
+    if (idx >= 0 && idx < e.photoUrls!.length) return e.photoUrls![idx];
+    return e.photoUrls![0];
+  }
+
   String _money(num? v, String currency) {
-    if (v == null) return '—';
+    if (v == null || v == 0) return 'N/A — Recycle';
     final symbol = currency == 'INR' ? '₹' : '$currency ';
     return '$symbol${v.toStringAsFixed(0)}';
   }
@@ -77,6 +85,21 @@ class HealthCardView extends StatelessWidget {
                   child: Column(
                     children: [
                       Container(height: 8, decoration: const BoxDecoration(color: Color(0xFFFF9900), borderRadius: BorderRadius.vertical(top: Radius.circular(10)))),
+
+                      // Hero photo
+                      if (_heroPhotoUrl(e) != null)
+                        Container(
+                          width: double.infinity,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            image: DecorationImage(
+                              image: NetworkImage(_heroPhotoUrl(e)!),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+
                       Padding(
                         padding: const EdgeInsets.all(32.0),
                         child: Column(

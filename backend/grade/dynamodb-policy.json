@@ -21,6 +21,21 @@
         "dynamodb:PutItem"
       ],
       "Resource": "arn:aws:dynamodb:ap-south-1:191918535218:table/Evaluations"
+    },
+    {
+      "Sid": "InvokeBedrock",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:*::foundation-model/amazon.nova-*",
+        "arn:aws:bedrock:*:191918535218:inference-profile/apac.amazon.nova-*"
+      ]
+    },
+    {
+      "Sid": "ReadPhotosFromS3",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::amazeloop-*/*"
     }
   ]
 }

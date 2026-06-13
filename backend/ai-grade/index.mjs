@@ -186,13 +186,20 @@ async function gradeWithVision({ images, productName, category }) {
  * Computes the estimated resale value. Uses the model's priceMultiplier, but
  * clamps it into the allowed band for the chosen condition as a safety net,
  * then rounds to the nearest 10.
+ *
+ * RULE: If the item is Damaged, it goes straight to Recycle — no resale value.
  */
 function computeResaleValue(normalizedPrice, condition, priceMultiplier) {
+  // Damaged items have no resale value — they go to Recycle directly.
+  if (condition === "Damaged") {
+    return { estimatedResaleValue: 0, appliedMultiplier: 0 };
+  }
+
   const range = CONDITION_RANGE[condition] || [0.4, 0.6];
   const [lo, hi] = range;
   let m = Number(priceMultiplier);
-  if (Number.isNaN(m)) m = (lo + hi) / 2; // model gave none -> midpoint of band
-  m = Math.max(lo, Math.min(hi, m)); // enforce the condition's band
+  if (Number.isNaN(m)) m = (lo + hi) / 2;
+  m = Math.max(lo, Math.min(hi, m));
   const raw = (Number(normalizedPrice) || 0) * m;
   return { estimatedResaleValue: Math.round(raw / 10) * 10, appliedMultiplier: m };
 }

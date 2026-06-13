@@ -29,6 +29,10 @@ class EvaluationInput {
   String? chosenDisposition;
   bool? isOverride;
 
+  // Photos
+  List<String>? photoUrls;
+  int? bestPhotoIndex;
+
   EvaluationInput({
     this.evaluationId,
     this.productName,
@@ -54,6 +58,8 @@ class EvaluationInput {
     this.nearestWarehouseId,
     this.chosenDisposition,
     this.isOverride,
+    this.photoUrls,
+    this.bestPhotoIndex,
   });
 
   factory EvaluationInput.fromJson(Map<String, dynamic> json) {
@@ -75,6 +81,17 @@ class EvaluationInput {
       condition: json['condition'] as String?,
       conditionReason: json['conditionReason'] as String?,
       estimatedResaleValue: json['estimatedResaleValue'] as num?,
+      recommendedRoute: json['recommendedRoute'] as String?,
+      finalDisposition: json['finalDisposition'] as String?,
+      routeReason: json['routeReason'] as String?,
+      distanceKm: json['distanceKm'] as num?,
+      nearestWarehouseId: json['nearestWarehouseId'] as String?,
+      chosenDisposition: json['chosenDisposition'] as String?,
+      isOverride: json['isOverride'] as bool?,
+      photoUrls: json['photoUrls'] != null
+          ? List<String>.from((json['photoUrls'] as List).map((e) => e.toString()))
+          : null,
+      bestPhotoIndex: json['bestPhotoIndex'] as int?,
     );
   }
 }

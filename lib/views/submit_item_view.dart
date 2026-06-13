@@ -54,26 +54,27 @@ class _SubmitItemViewState extends State<SubmitItemView> {
     if (_productNameController.text.trim().isEmpty ||
         _selectedCategory == null ||
         _selectedReason == null ||
-        _orderOrPriceController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all item details.')));
+        _orderOrPriceController.text.trim().isEmpty ||
+        _pincodeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all item details including pincode.')));
       return;
     }
 
     setState(() => _isGrading = true);
 
     try {
-      // 1. Upload all selected photos to S3 and collect their URLs
-      final List<String> photoUrls = [];
-      for (int i = 0; i < _selectedImages.length; i++) {
-        final image = _selectedImages[i];
-        final bytes = await image.readAsBytes();
-        final url = await _gradeRepository.uploadPhoto(
-          bytes: bytes,
-          fileName: image.name.isNotEmpty ? image.name : 'photo_$i.jpg',
-          contentType: 'image/jpeg',
-        );
-        photoUrls.add(url);
-      }
+      // 1. Upload all selected photos to S3 in parallel and collect their URLs
+      final List<String> photoUrls = await Future.wait(
+        List.generate(_selectedImages.length, (i) async {
+          final image = _selectedImages[i];
+          final bytes = await image.readAsBytes();
+          return _gradeRepository.uploadPhoto(
+            bytes: bytes,
+            fileName: image.name.isNotEmpty ? image.name : 'photo_$i.jpg',
+            contentType: 'image/jpeg',
+          );
+        }),
+      );
 
       // 2. Submit for price/order grading -> creates the Evaluation record
       final EvaluationInput result = await _gradeRepository.gradeItem(
@@ -92,8 +93,11 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           result.condition = ai.condition;
           result.conditionReason = ai.conditionReason;
           result.estimatedResaleValue = ai.estimatedResaleValue;
+          result.bestPhotoIndex = ai.bestPhotoIndex;
+          result.photoUrls = photoUrls;
         } catch (e) {
           // AI grading is best-effort; proceed with price data if it fails.
+          result.photoUrls = photoUrls;
           debugPrint('AI grading failed: $e');
         }
       }

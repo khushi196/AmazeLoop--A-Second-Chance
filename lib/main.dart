@@ -19,6 +19,7 @@ class AmazonLoopApp extends StatefulWidget {
 
 class _AmazonLoopAppState extends State<AmazonLoopApp> {
   bool _amplifyConfigured = false;
+  String? _amplifyError;
 
   @override
   void initState() {
@@ -40,6 +41,9 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
       });
     } catch (e) {
       debugPrint('Error configuring Amplify: $e');
+      setState(() {
+        _amplifyError = 'Failed to initialise. Please restart the app.';
+      });
     }
   }
 
@@ -72,7 +76,19 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
           ),
         ),
       ),
-      home: _amplifyConfigured
+      home: _amplifyError != null
+          ? Scaffold(
+              body: Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(_amplifyError!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: _configureAmplify, child: const Text('Retry')),
+                ]),
+              ),
+            )
+          : _amplifyConfigured
           ? const LoginView()
           : const Scaffold(
               body: Center(
