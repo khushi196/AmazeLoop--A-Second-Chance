@@ -6,7 +6,8 @@ import 'data/session.dart';
 import 'ListingDetailScreen.dart';
 
 class MarketplaceTab extends StatefulWidget {
-  const MarketplaceTab({Key? key}) : super(key: key);
+  final VoidCallback? onNotificationsTap;
+  const MarketplaceTab({Key? key, this.onNotificationsTap}) : super(key: key);
 
   @override
   State<MarketplaceTab> createState() => _MarketplaceTabState();
@@ -271,7 +272,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
               IconButton(
                 icon: const Icon(Icons.notifications_none,
                     color: Colors.white70, size: 22),
-                onPressed: () {},
+                onPressed: widget.onNotificationsTap,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),

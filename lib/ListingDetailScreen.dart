@@ -20,6 +20,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   int _heroIndex = 0;
   bool _busy = false;
   String? _outcome;
+  bool _descExpanded = false;
 
   @override
   void initState() {
@@ -59,7 +60,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                onPressed: () {},
+                onPressed: () => Navigator.pop(context),
               ),
               Positioned(
                 right: 8,
@@ -570,7 +571,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   // Product Description card (full width bottom)
   // ─────────────────────────────────────────────────────────────────────────
   Widget _buildProductDescription(Listing l, HealthCard hc) {
-    final description = hc.conditionReason ?? 'Fully tested and verified by AI.';
+    final condDesc = hc.conditionReason ?? 'Fully tested and verified by AI.';
+    final issues = hc.issues;
+    final routeReason = hc.routeReason;
+    final scorePercent = hc.conditionScore != null
+        ? ((hc.conditionScore!) * 100).toStringAsFixed(0)
+        : null;
+    final isWarehouse = l.sellerType == 'WAREHOUSE';
+    final sellerLabel = isWarehouse ? 'Power Seller' : 'Verified Seller';
+    final warehouseCity = _warehouseCity(l.nearestWarehouseId);
+    final listedDate = _formatListedDate(l.createdAt);
+    final co2 = hc.circularImpactKg;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -582,29 +594,323 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+
+          // ── Title ──────────────────────────────────────────────────────
           const Text(
             'Product Description',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // ── Overview paragraph ─────────────────────────────────────────
           Text(
-            '${l.title}. $description',
-            style: TextStyle(color: Colors.grey.shade700, fontSize: 14, height: 1.5),
+            _buildOverviewText(l, hc, condDesc),
+            style: TextStyle(
+                fontSize: 14, color: Colors.grey.shade800, height: 1.65),
           ),
-          const SizedBox(height: 12),
-          Row(
+
+          // ── Key specs chips ─────────────────────────────────────────────
+          if (_descExpanded) ...[
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Text(
-                'Read more',
-                style: TextStyle(color: amazonOrange, fontSize: 13, fontWeight: FontWeight.w600),
+              if (l.category != null)
+                _tag(Icons.category_outlined, l.category!),
+              _tag(
+                Icons.shield_outlined,
+                l.condition ?? '—',
+                color: _conditionColor(l.condition),
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.keyboard_arrow_down, size: 16, color: amazonOrange),
+              if (scorePercent != null)
+                _tag(Icons.analytics_outlined, 'Score $scorePercent/100'),
+              _tag(
+                isWarehouse ? Icons.warehouse_outlined : Icons.verified_outlined,
+                sellerLabel,
+                color: isWarehouse ? amazonOrange : Colors.blue.shade700,
+              ),
+              if (warehouseCity != null)
+                _tag(Icons.location_on_outlined, 'Ships from $warehouseCity'),
             ],
+          ),
+
+          // ── AI-observed issues ─────────────────────────────────────────
+          if (issues.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text(
+              'AI-observed details',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.9),
+            ),
+            const SizedBox(height: 8),
+            ...issues.map(
+              (issue) => Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        issue,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                            height: 1.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // ── Why this listing ───────────────────────────────────────────
+          if ((routeReason ?? '').isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8EF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: amazonOrange.withOpacity(0.25)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lightbulb_outline,
+                      size: 16, color: amazonOrange),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Why this listing',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: textPrimary,
+                              letterSpacing: 0.5),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          routeReason!,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade800,
+                              fontStyle: FontStyle.italic,
+                              height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Sustainability block ───────────────────────────────────────
+          if (co2 != null && co2 > 0) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.eco_outlined,
+                      size: 18, color: Colors.green.shade700),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'By buying this refurbished item you help avoid '
+                      '${co2.toStringAsFixed(1)} kg of CO₂ emissions — '
+                      'equivalent to not burning ${(co2 / 2.3).toStringAsFixed(1)} L of fuel.',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade800,
+                          height: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Footer meta ───────────────────────────────────────────────
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              _meta('Owners', '${hc.owners} previous'),
+              if (listedDate != null) _meta('Listed', listedDate),
+              _meta(
+                'Warranty',
+                (hc.warrantyMonthsRemaining == null ||
+                        hc.warrantyMonthsRemaining == 0)
+                    ? 'No warranty'
+                    : '${hc.warrantyMonthsRemaining} months remaining',
+              ),
+              _meta('Return risk', l.risk),
+            ],
+          ),
+          ], // end _descExpanded
+
+          // ── Read more / Show less toggle ──────────────────────────────
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => setState(() => _descExpanded = !_descExpanded),
+            child: Row(
+              children: [
+                Text(
+                  _descExpanded ? 'Show less' : 'Read more',
+                  style: TextStyle(
+                      color: amazonOrange,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _descExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: amazonOrange,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  String _buildOverviewText(Listing l, HealthCard hc, String condDesc) {
+    final cond = l.condition ?? 'refurbished';
+    final condLower = cond.toLowerCase();
+    final category = l.category ?? 'item';
+
+    String intro;
+    if (condLower == 'like new') {
+      intro =
+          'This ${l.title} is in Like New condition — '
+          'it shows virtually no signs of use and functions exactly as expected from a new unit.';
+    } else if (condLower == 'good') {
+      intro =
+          'This ${l.title} is in Good condition with only minor cosmetic wear. '
+          'All features and functions are fully working.';
+    } else if (condLower == 'used') {
+      intro =
+          'This ${l.title} is a used $category that has been '
+          'AI-graded and verified. It works as intended with visible signs of prior use.';
+    } else {
+      intro = 'This ${l.title} has been AI-graded and is listed for sale.';
+    }
+
+    return '$intro $condDesc';
+  }
+
+  String? _warehouseCity(String? id) {
+    const map = {
+      'BLR': 'Bengaluru', 'MUM': 'Mumbai', 'DEL': 'Delhi',
+      'HYD': 'Hyderabad', 'MAA': 'Chennai', 'PNQ': 'Pune',
+    };
+    return id != null ? map[id] : null;
+  }
+
+  String? _formatListedDate(String? iso) {
+    if (iso == null || iso.isEmpty) return null;
+    final d = DateTime.tryParse(iso);
+    if (d == null) return null;
+    const m = ['Jan','Feb','Mar','Apr','May','Jun',
+                'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${m[d.month - 1]} ${d.day}, ${d.year}';
+  }
+
+  Widget _tag(IconData icon, String label, {Color? color}) {
+    final c = color ?? Colors.grey.shade700;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: c),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+                fontSize: 11.5, color: c, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _meta(String label, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.w500),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade800,
+              fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Color _conditionColor(String? c) {
+    switch (c) {
+      case 'Like New':
+        return const Color(0xFF00875A);
+      case 'Good':
+        return amazonOrange;
+      case 'Used':
+        return Colors.purple.shade600;
+      case 'Damaged':
+        return Colors.red.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -709,21 +1015,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         ],
       ),
     );
-  }
-
-  Color _conditionColor(String condition) {
-    switch (condition) {
-      case 'Like New':
-        return const Color(0xFF00687A);
-      case 'Good':
-        return amazonOrange;
-      case 'Used':
-        return Colors.purple.shade700;
-      case 'Damaged':
-        return Colors.red.shade700;
-      default:
-        return Colors.grey.shade700;
-    }
   }
 
   Widget _buildError(String message) {

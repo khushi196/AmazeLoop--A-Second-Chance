@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/report_generator.dart';
+import '../data/repositories/grade_repository.dart';
 import 'submit_item_view.dart';
 
 class HealthCardView extends StatelessWidget {
@@ -555,6 +556,12 @@ class HealthCardView extends StatelessWidget {
                             onFinishToHistory!();
                           } else if (onNavigate != null) {
                             onNavigate!(SubmitItemView(onNavigate: onNavigate));
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Item routed. Check the History tab to track its status.'),
+                              ),
+                            );
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -577,6 +584,29 @@ class HealthCardView extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+
+                // ─── Mis-graded feedback ───
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: e == null
+                        ? null
+                        : () => _showFeedbackDialog(context, e.evaluationId!),
+                    icon: Icon(Icons.flag_outlined, size: 16, color: Colors.grey.shade600),
+                    label: Text(
+                      'Mark as mis-graded',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -629,5 +659,71 @@ class HealthCardView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  void _showFeedbackDialog(BuildContext context, String evaluationId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text(
+            'Report mis-grading',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: const Text(
+            'How was the AI grading inaccurate?',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _submitFeedback(context, evaluationId, 'too_optimistic');
+              },
+              child: const Text('Too optimistic'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _submitFeedback(context, evaluationId, 'too_strict');
+              },
+              child: const Text('Too strict'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _submitFeedback(
+      BuildContext context, String evaluationId, String feedbackType) async {
+    try {
+      await GradeRepository().submitFeedback(
+        evaluationId: evaluationId,
+        feedbackType: feedbackType,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feedback recorded. Thank you!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not submit feedback: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 }

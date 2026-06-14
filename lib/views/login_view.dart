@@ -3,6 +3,7 @@ import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../BuyerDashboard.dart';
 import '../SellIntroScreen.dart';
+import '../data/repositories/grade_repository.dart';
 import '../data/session.dart';
 
 /// Where the user came from. Used to decide what role to assign on signup
@@ -198,10 +199,15 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
-  /// Loads grading history for the logged-in user.
-  /// Body will be implemented when the history backend is ready.
+  /// Preloads grading history after login so the History tab renders instantly.
   Future<void> _loadHistory(String userId) async {
-    // TODO: Fetch grading history from backend for this userId
+    // Fire-and-forget — the HistoryView already fetches on mount,
+    // this is just a best-effort cache warm-up that doesn't block login.
+    try {
+      await GradeRepository().listEvaluations(userId: userId, limit: 20);
+    } catch (_) {
+      // Non-fatal — History tab will fetch on open.
+    }
   }
 
   /// Reads user attributes (sub, custom:role) and the Cognito ID token from

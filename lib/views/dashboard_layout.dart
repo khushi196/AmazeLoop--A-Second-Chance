@@ -126,8 +126,13 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                         ),
                       ),
                       const SizedBox(width: 24),
-                      IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white70), onPressed: () {}),
-                      IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white70), onPressed: () {}),
+                      IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white70), onPressed: () {
+                        setState(() {
+                          _selectedIndex = 1;
+                          _currentCustomView = null;
+                        });
+                      }),
+                      IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white70), onPressed: null),
                       const SizedBox(width: 16),
                       const CircleAvatar(radius: 16, backgroundColor: Color(0xFFFF9900), child: Text('EV', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white))),
                     ],

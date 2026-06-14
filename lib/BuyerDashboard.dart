@@ -27,7 +27,12 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
       GlobalKey<NotificationsTabState>();
 
   late final List<Widget> _views = [
-    const MarketplaceTab(),
+    MarketplaceTab(
+      onNotificationsTap: () {
+        setState(() => _currentIndex = 3);
+        _notificationsKey.currentState?.reload();
+      },
+    ),
     ReservedTab(key: _reservedKey),
     PurchasesTab(key: _purchasesKey),
     NotificationsTab(key: _notificationsKey),

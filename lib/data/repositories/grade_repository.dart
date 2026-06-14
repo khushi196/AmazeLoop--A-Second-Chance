@@ -23,6 +23,7 @@ class GradeRepository {
   static const String _purchaseUrl = '$_baseUrl/purchase';
   static const String _purchasesUrl = '$_baseUrl/purchases';
   static const String _notificationsUrl = '$_baseUrl/notifications';
+  static const String _feedbackUrl = '$_baseUrl/feedback';
 
   /// Uploads a single image to S3 via a presigned URL and returns the public
   /// object URL (to be stored as a photoUrl on the evaluation).
@@ -371,6 +372,29 @@ class GradeRepository {
       );
     }
     throw Exception('Failed to load notifications (${response.statusCode}).');
+  }
+
+  /// Marks an evaluation as mis-graded (too optimistic or too strict).
+  Future<void> submitFeedback({
+    required String evaluationId,
+    required String feedbackType,
+  }) async {
+    late http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse(_feedbackUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'evaluationId': evaluationId,
+          'feedbackType': feedbackType,
+        }),
+      );
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to submit feedback (${response.statusCode}).');
+    }
   }
 }
 

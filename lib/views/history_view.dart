@@ -262,6 +262,7 @@ class _HistoryViewState extends State<HistoryView> {
               DataColumn(label: _HeaderCell('RESALE VALUE')),
               DataColumn(label: _HeaderCell('STATUS')),
               DataColumn(label: _HeaderCell('MARKETPLACE')),
+              DataColumn(label: _HeaderCell('')), // feedback icon column
               DataColumn(label: _HeaderCell('ACTION')),
             ],
             rows: _evaluations.map((ev) {
@@ -415,6 +416,16 @@ class _HistoryViewState extends State<HistoryView> {
                         ),
                       );
                     }),
+                  ),
+
+                  // Feedback flag
+                  DataCell(
+                    ev['feedbackFlag'] == true
+                        ? Tooltip(
+                            message: 'Marked as ${ev['feedbackType'] ?? 'mis-graded'}',
+                            child: Icon(Icons.flag, size: 16, color: Colors.orange.shade700),
+                          )
+                        : const SizedBox.shrink(),
                   ),
 
                   // Action

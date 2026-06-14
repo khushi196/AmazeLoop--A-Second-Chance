@@ -92,6 +92,8 @@ export const handler = async (event) => {
     status: it.status,
     purchaseStatus: it.purchaseStatus ?? null,
     buyerUserId: it.buyerUserId ?? null,
+    feedbackFlag: it.feedbackFlag ?? false,
+    feedbackType: it.feedbackType ?? null,
     photoUrls: it.photoUrls,
     bestPhotoIndex: it.bestPhotoIndex,
   }));

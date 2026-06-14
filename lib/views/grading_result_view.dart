@@ -255,6 +255,12 @@ class GradingResultView extends StatelessWidget {
                                   onFinishToHistory: onFinishToHistory,
                                 ),
                               );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Grading complete. Open the History tab to view results.'),
+                                ),
+                              );
                             }
                           },
                           style: ElevatedButton.styleFrom(
