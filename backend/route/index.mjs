@@ -106,6 +106,13 @@ function nearestWarehouse(pincode) {
 // ---------------------------------------------------------------------------
 const REASONABLE_DISTANCE_KM = 600;
 
+// A still-usable item (Used/Good) whose resale value is at or below this
+// ceiling isn't worth the reverse-logistics cost of listing it, so the router
+// recommends donating it to a local partner channel instead of squeezing a
+// marginal resale profit. Kept in sync with kDonateResaleCeilingInr on the
+// frontend (lib/data/route_helpers.dart).
+const DONATE_RESALE_CEILING = 1000;
+
 /**
  * Scores a single allowed route. Higher is better.
  *   routeScore = net-value score + condition + confidence + route fit - cost burden
@@ -132,6 +139,7 @@ function decideRouteDynamic({
   conditionScore,
   confidence = 1,
   normalizedPrice,
+  estimatedResaleValue = 0,
   priceMultiplier,
   postRefurbMultiplier,
   repairable,
@@ -207,6 +215,23 @@ function decideRouteDynamic({
     originReturnNet >= recycleNet;
 
   if (returnToOriginEligible) return "ReturnToOrigin";
+
+  // -------------------------------------------------------------------------
+  // Donate (circular-ladder option): a still-usable item (Used/Good) whose
+  // resale value is too low to justify listing is better donated than resold
+  // for a marginal profit. Checked before the resell/refurbish/recycle scoring
+  // so donation is recommended automatically for these low-value items.
+  // -------------------------------------------------------------------------
+  const resaleForDonate =
+    estimatedResaleValue > 0 ? estimatedResaleValue : asIsResaleValue;
+  const donateEligible =
+    (condition === "Used" || condition === "Good") &&
+    conditionScore >= 0.45 &&
+    !hasSevereDamage &&
+    !hasDirectResaleBlockers &&
+    resaleForDonate <= DONATE_RESALE_CEILING;
+
+  if (donateEligible) return "Donate";
 
   const directEligible =
     !hasSevereDamage &&
@@ -379,6 +404,7 @@ function buildEconomics(r) {
     conditionScore: Number.isNaN(conditionScore) ? 0.5 : conditionScore,
     confidence: Number.isNaN(confidence) ? 1 : confidence,
     normalizedPrice,
+    estimatedResaleValue: Number(r.estimatedResaleValue) || 0,
     priceMultiplier,
     postRefurbMultiplier,
     repairable,
@@ -412,6 +438,7 @@ function buildEconomics(r) {
 /** Maps a final disposition + queue into the operator-facing route label. */
 function recommendedRouteFor(disposition, sortingQueue) {
   if (disposition === "ReturnToOrigin") return "Return to origin warehouse";
+  if (disposition === "Donate") return "Donate to local partner channel";
   if (disposition === "Recycle") return "Recycle / parts harvesting at nearest warehouse";
   if (disposition === "Refurbish") return "Send to nearest warehouse for refurbishment";
   // Resell

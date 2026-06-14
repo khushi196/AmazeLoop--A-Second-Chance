@@ -9,15 +9,24 @@
 /// Rules mirrored verbatim from the product spec.
 library;
 
+/// Resale value (INR) at or below which a still-usable item is considered
+/// "low value" — not worth reselling, so donation becomes a sensible option.
+const num kDonateResaleCeilingInr = 1000;
+
 /// Returns the route option keys that should be shown for the given role + item.
 /// Customers always get the standard three options. Warehouse users get
-/// ReturnToOrigin prepended when the item is eligible.
+/// ReturnToOrigin prepended when the item is eligible. A "Donate" option is
+/// appended for still-usable (Used/Good) items whose resale value is too low
+/// to be worth listing.
 List<String> getVisibleRoutes(String? role, Map<String, dynamic>? item) {
-  const routes = <String>['Resell', 'Refurbish', 'Recycle'];
+  final routes = <String>['Resell', 'Refurbish', 'Recycle'];
   if (role == 'warehouse' &&
       item?['sourceType'] == 'customer_return' &&
       item?['originWarehouseAvailable'] == true) {
-    return ['ReturnToOrigin', ...routes];
+    routes.insert(0, 'ReturnToOrigin');
+  }
+  if (item?['donateEligible'] == true) {
+    routes.add('Donate');
   }
   return routes;
 }
@@ -38,6 +47,7 @@ String getPublicDispositionLabel(String? finalDisposition, String? role) {
 bool shouldPushToMarketplace(String? finalDisposition, String? itemStatus) {
   if (finalDisposition == 'ReturnToOrigin') return false;
   if (finalDisposition == 'Recycle') return false;
+  if (finalDisposition == 'Donate') return false;
   if (finalDisposition == 'Resell') {
     return itemStatus == 'ready_for_sale';
   }
@@ -55,6 +65,8 @@ Map<String, dynamic> deriveRouteEligibility({
   String? reason,
   String? sortingQueue,
   String? nearestWarehouseId,
+  String? condition,
+  num? estimatedResaleValue,
 }) {
   // "Returned Amazon order" is the customer-return source; everything else is
   // a consumer trade-in or unknown.
@@ -68,8 +80,14 @@ Map<String, dynamic> deriveRouteEligibility({
   final originWarehouseAvailable =
       nearestWarehouseId != null && nearestWarehouseId.isNotEmpty;
 
+  // Donation fits a still-usable item (Used/Good) whose resale value is too
+  // low to be worth listing on the marketplace.
+  final donateEligible = (condition == 'Used' || condition == 'Good') &&
+      (estimatedResaleValue ?? 0) <= kDonateResaleCeilingInr;
+
   return {
     'sourceType': sourceType,
     'originWarehouseAvailable': originWarehouseAvailable,
+    'donateEligible': donateEligible,
   };
 }

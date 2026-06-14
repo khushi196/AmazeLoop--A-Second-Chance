@@ -8,6 +8,16 @@ import '../models/purchase.dart';
 import '../models/app_notification.dart';
 import '../session.dart';
 
+/// Thrown when a reserve/buy loses the race for an item — the backend's
+/// conditional write on purchaseStatus rejected this request because another
+/// buyer already claimed it (HTTP 409).
+class PurchaseConflictException implements Exception {
+  final String message;
+  PurchaseConflictException(this.message);
+  @override
+  String toString() => message;
+}
+
 /// Talks to the real AmazeLoop backend (API Gateway).
 class GradeRepository {
   static const String _baseUrl =
@@ -296,6 +306,12 @@ class GradeRepository {
     }
     final message = decoded['error']?.toString() ??
         'Failed to ${action.toLowerCase()} listing (${response.statusCode}).';
+    // A 409 means another buyer won the race for this item (the backend's
+    // conditional write rejected ours). Surface it as a typed exception so the
+    // UI can prompt the buyer to refresh.
+    if (response.statusCode == 409) {
+      throw PurchaseConflictException(message);
+    }
     throw Exception(message);
   }
 

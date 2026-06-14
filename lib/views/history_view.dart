@@ -80,6 +80,9 @@ class _HistoryViewState extends State<HistoryView> {
     if (disposition == 'Refurbish') {
       return (label: 'Refurbishing', fg: Colors.purple.shade700, bg: Colors.purple.shade50);
     }
+    if (disposition == 'Donate') {
+      return (label: 'Donated', fg: Colors.teal.shade700, bg: Colors.teal.shade50);
+    }
     if (disposition == 'ReturnToOrigin') {
       final label = Session.role == 'customer' ? 'Processing' : 'Returned to origin';
       return (label: label, fg: Colors.indigo.shade700, bg: Colors.indigo.shade50);

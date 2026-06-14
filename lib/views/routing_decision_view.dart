@@ -54,6 +54,13 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
       'bgColor': Color(0xFFE0F2F1),
       'iconColor': Color(0xFF00897B),
     },
+    'Donate': {
+      'title': 'Donate locally',
+      'desc': 'Give to a vetted local partner channel for reuse.',
+      'icon': Icons.volunteer_activism_outlined,
+      'bgColor': Color(0xFFF3E5F5),
+      'iconColor': Color(0xFF8E24AA),
+    },
   };
 
   /// The route options visible to the current user, derived from role + item.
@@ -63,6 +70,8 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
       reason: e?.reason,
       sortingQueue: e?.sortingQueue,
       nearestWarehouseId: e?.nearestWarehouseId,
+      condition: e?.condition,
+      estimatedResaleValue: e?.estimatedResaleValue,
     );
     final keys = getVisibleRoutes(Session.role, eligibility);
     return keys

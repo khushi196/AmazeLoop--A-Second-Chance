@@ -70,6 +70,12 @@ class HealthCardView extends StatelessWidget {
           'Inventory reconciliation.',
           'Ready for restocking or processing.',
         ];
+      case 'Donate':
+        return [
+          'Route to a vetted local donation partner.',
+          'Partner collects and redistributes the item.',
+          'Donation acknowledgement issued.',
+        ];
       default:
         return ['Proceed with the selected disposition.'];
     }
@@ -85,6 +91,8 @@ class HealthCardView extends StatelessWidget {
         return 'Responsible e-waste disposal.';
       case 'ReturnToOrigin':
         return 'Return to originating warehouse.';
+      case 'Donate':
+        return 'Donated to a local partner channel.';
       default:
         return 'Processing your item.';
     }

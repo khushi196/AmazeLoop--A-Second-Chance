@@ -972,6 +972,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         already ? 'You already reserved this item.' : 'Item reserved — held for 24h.',
         Colors.green.shade700,
       );
+    } on PurchaseConflictException {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _snackRefresh('Item was just reserved by another buyer. Please refresh.');
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -990,6 +994,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         _outcome = 'SOLD';
       });
       _snack('Purchase confirmed.', Colors.green.shade700);
+    } on PurchaseConflictException {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _snackRefresh('This item is no longer available — another buyer claimed it. Please refresh.');
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -1001,6 +1009,25 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(backgroundColor: bg, content: Text(message)),
     );
+  }
+
+  /// Conflict snackbar with a Refresh action that re-fetches the listing so
+  /// the buyer immediately sees the item's updated (reserved/sold) status.
+  void _snackRefresh(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 6),
+          content: Text(message),
+          action: SnackBarAction(
+            label: 'Refresh',
+            textColor: Colors.white,
+            onPressed: _retry,
+          ),
+        ),
+      );
   }
 
   Widget _statusButton(String label, IconData icon, Color color) {

@@ -19,7 +19,7 @@ const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-pro-v1:0";
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 const bedrock = new BedrockRuntimeClient({ region: REGION });
 
-const VALID_DISPOSITIONS = ["Resell", "Refurbish", "Recycle", "ReturnToOrigin"];
+const VALID_DISPOSITIONS = ["Resell", "Refurbish", "Recycle", "ReturnToOrigin", "Donate"];
 
 function response(statusCode, body) {
   return {
@@ -94,7 +94,7 @@ export const handler = async (event) => {
   if (!VALID_DISPOSITIONS.includes(chosenDisposition)) {
     return response(400, {
       error:
-        "chosenDisposition must be one of Resell, Refurbish, Recycle, ReturnToOrigin.",
+        "chosenDisposition must be one of Resell, Refurbish, Recycle, ReturnToOrigin, Donate.",
     });
   }
 
@@ -129,7 +129,8 @@ export const handler = async (event) => {
   // override happens, also refresh routeReason so the seller's history,
   // listing detail, and Health Card all reflect the actual chosen path.
   try {
-    const isReturnToOrigin = chosenDisposition === "ReturnToOrigin";
+    const isInternalDisposition =
+      chosenDisposition === "ReturnToOrigin" || chosenDisposition === "Donate";
     const setParts = [
       "chosenDisposition = :cd",
       "isOverride = :ov",
@@ -140,7 +141,7 @@ export const handler = async (event) => {
       ":ov": isOverride,
       ":st": "ROUTED",
     };
-    if (isReturnToOrigin) {
+    if (isInternalDisposition) {
       setParts.push("marketplaceStatus = :ms");
       exprValues[":ms"] = "not_listed";
     }
