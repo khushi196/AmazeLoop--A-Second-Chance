@@ -33,6 +33,9 @@ class EvaluationInput {
   List<String>? photoUrls;
   int? bestPhotoIndex;
 
+  // Marketplace resale counter (owners = 1 + resaleCount).
+  int? resaleCount;
+
   EvaluationInput({
     this.evaluationId,
     this.productName,
@@ -60,6 +63,7 @@ class EvaluationInput {
     this.isOverride,
     this.photoUrls,
     this.bestPhotoIndex,
+    this.resaleCount,
   });
 
   factory EvaluationInput.fromJson(Map<String, dynamic> json) {
@@ -92,6 +96,7 @@ class EvaluationInput {
           ? List<String>.from((json['photoUrls'] as List).map((e) => e.toString()))
           : null,
       bestPhotoIndex: json['bestPhotoIndex'] as int?,
+      resaleCount: (json['resaleCount'] as num?)?.toInt(),
     );
   }
 }

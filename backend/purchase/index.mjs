@@ -168,7 +168,7 @@ export const handler = async (event) => {
           TableName: EVALUATIONS_TABLE,
           Key: { evaluationId },
           UpdateExpression:
-            "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t REMOVE reservationExpiresAt",
+            "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t REMOVE reservationExpiresAt ADD resaleCount :one",
           // Succeed if the item is free, OR already reserved by this buyer.
           ConditionExpression:
             "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR purchaseStatus <> :sold",
@@ -177,6 +177,7 @@ export const handler = async (event) => {
             ":ps": "SOLD",
             ":t": nowIso,
             ":sold": "SOLD",
+            ":one": 1,
           },
         })
       );

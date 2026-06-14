@@ -111,9 +111,9 @@ function deriveIssues(conditionReason) {
 }
 
 /**
- * Estimates the carbon-footprint avoided (kg CO2e) by reusing the item.
- * Real values would come from a category-keyed lookup or a dedicated service;
- * for now this is a coarse approximation good enough for the buyer card.
+ * Estimates the manufacturing carbon-footprint avoided (kg CO2e) by reusing
+ * the item rather than producing a new one. Coarse, category-keyed lookup —
+ * good enough for the buyer card and clearly approximate.
  */
 function circularImpactKg(category) {
   const c = (category || "").toLowerCase();
@@ -127,12 +127,38 @@ function circularImpactKg(category) {
   return 25; // generic fallback
 }
 
+// ---------------------------------------------------------------------------
+// Reverse-logistics estimates (transparent approximations, not measured)
+// ---------------------------------------------------------------------------
+// Reselling an item locally avoids shipping it back along its inbound leg to
+// the origin/returns hub. We approximate the avoided distance as the measured
+// distance to the nearest warehouse plus a constant origin-hub segment, and
+// convert km to CO2e using a small-parcel road-freight factor.
+const REVERSE_HUB_CONSTANT_KM = 150;  // origin warehouse -> manufacturer/returns hub
+const FREIGHT_CO2_KG_PER_KM = 0.12;   // ~kg CO2e per km for a small parcel by road
+
+/** Estimated reverse-shipping distance (km) avoided by reselling locally. */
+function reverseShippingAvoidedKm(distanceKm) {
+  const d = Number(distanceKm) || 0;
+  return Math.round(d + REVERSE_HUB_CONSTANT_KM);
+}
+
+/** Estimated transport CO2e (kg) saved by avoiding that reverse leg. */
+function transportCo2SavedKg(distanceKm) {
+  const km = reverseShippingAvoidedKm(distanceKm);
+  return Math.round(km * FREIGHT_CO2_KG_PER_KM * 10) / 10;
+}
+
 function buildHealthCard(item) {
   // Prefer the structured visibleIssues array from AI grading; fall back to
   // splitting the one-sentence conditionReason for older records.
   const issues = Array.isArray(item.visibleIssues) && item.visibleIssues.length > 0
     ? item.visibleIssues.map((s) => String(s).trim()).filter((s) => s.length > 0)
     : deriveIssues(item.conditionReason);
+
+  const distanceKm = Number(item.distanceKm) || 0;
+  // owners = the original owner (1) plus one per completed marketplace resale.
+  const owners = 1 + (Number(item.resaleCount) || 0);
 
   return {
     condition: item.condition || null,
@@ -142,13 +168,17 @@ function buildHealthCard(item) {
     conditionReason: item.conditionReason || null,
     routeReason: item.routeReason || null,
     finalDisposition: item.chosenDisposition || item.finalDisposition || null,
-    // The fields below are not yet sourced from the pipeline. Placeholder
-    // values keep the contract stable for the frontend; replace with real
-    // signals (warranty registry, ownership history, LCA service) when
-    // those upstream sources are wired in.
+    // Warranty is not sourced from a warranty registry yet, so we report it
+    // honestly as "no warranty" rather than fabricating a number.
     warrantyMonthsRemaining: 0,
-    owners: 1,
+    // Owners is now a real counter, incremented on each marketplace BUY.
+    owners,
+    // Manufacturing CO2e avoided by reuse (coarse, category-keyed estimate).
     circularImpactKg: circularImpactKg(item.category),
+    // Reverse-logistics estimates derived from the routing distance. Both are
+    // transparent approximations and are labelled as such on the buyer card.
+    reverseShippingAvoidedKm: reverseShippingAvoidedKm(distanceKm),
+    co2SavedKg: transportCo2SavedKg(distanceKm),
   };
 }
 

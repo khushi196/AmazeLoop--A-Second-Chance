@@ -11,6 +11,8 @@ class HealthCard {
   final int? warrantyMonthsRemaining;
   final int owners;
   final double? circularImpactKg;
+  final int? reverseShippingAvoidedKm;
+  final double? co2SavedKg;
 
   const HealthCard({
     this.condition,
@@ -22,6 +24,8 @@ class HealthCard {
     this.warrantyMonthsRemaining,
     this.owners = 1,
     this.circularImpactKg,
+    this.reverseShippingAvoidedKm,
+    this.co2SavedKg,
   });
 
   factory HealthCard.fromJson(Map<String, dynamic> json) {
@@ -39,6 +43,8 @@ class HealthCard {
       warrantyMonthsRemaining: (json['warrantyMonthsRemaining'] as num?)?.toInt(),
       owners: (json['owners'] as num?)?.toInt() ?? 1,
       circularImpactKg: (json['circularImpactKg'] as num?)?.toDouble(),
+      reverseShippingAvoidedKm: (json['reverseShippingAvoidedKm'] as num?)?.toInt(),
+      co2SavedKg: (json['co2SavedKg'] as num?)?.toDouble(),
     );
   }
 }

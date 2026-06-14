@@ -582,6 +582,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     final warehouseCity = _warehouseCity(l.nearestWarehouseId);
     final listedDate = _formatListedDate(l.createdAt);
     final co2 = hc.circularImpactKg;
+    final reverseKm = hc.reverseShippingAvoidedKm;
+    final transportCo2 = hc.co2SavedKg;
 
     return Container(
       width: double.infinity,
@@ -736,22 +738,49 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.green.shade200),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.eco_outlined,
-                      size: 18, color: Colors.green.shade700),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'By buying this refurbished item you help avoid '
-                      '${co2.toStringAsFixed(1)} kg of CO₂ emissions — '
-                      'equivalent to not burning ${(co2 / 2.3).toStringAsFixed(1)} L of fuel.',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green.shade800,
-                          height: 1.5),
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.eco_outlined,
+                          size: 18, color: Colors.green.shade700),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'By buying this refurbished item you help avoid '
+                          '${co2.toStringAsFixed(1)} kg of CO₂ emissions — '
+                          'equivalent to not burning ${(co2 / 2.3).toStringAsFixed(1)} L of fuel.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade800,
+                              height: 1.5),
+                        ),
+                      ),
+                    ],
                   ),
+                  if (reverseKm != null && reverseKm > 0) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.local_shipping_outlined,
+                            size: 18, color: Colors.green.shade700),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Reselling locally avoids about $reverseKm km of '
+                            'reverse shipping'
+                            '${(transportCo2 != null && transportCo2 > 0) ? ' — roughly ${transportCo2.toStringAsFixed(1)} kg CO₂ saved in transport' : ''}. '
+                            '(Approximate estimate.)',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.green.shade800,
+                                height: 1.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -765,7 +794,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             spacing: 16,
             runSpacing: 4,
             children: [
-              _meta('Owners', '${hc.owners} previous'),
+              _meta('Owners', hc.owners <= 1 ? '1 (original)' : '${hc.owners} total'),
               if (listedDate != null) _meta('Listed', listedDate),
               _meta(
                 'Warranty',

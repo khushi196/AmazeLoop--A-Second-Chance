@@ -447,6 +447,8 @@ class _HistoryViewState extends State<HistoryView> {
                             nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
                             photoUrls: photos,
                             bestPhotoIndex: ev['bestPhotoIndex'] as int?,
+                            distanceKm: ev['distanceKm'] as num?,
+                            resaleCount: (ev['resaleCount'] as num?)?.toInt(),
                           );
                           widget.onNavigate!(HealthCardView(onNavigate: widget.onNavigate, evaluation: e));
                         }

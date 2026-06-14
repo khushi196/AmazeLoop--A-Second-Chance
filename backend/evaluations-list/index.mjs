@@ -89,6 +89,8 @@ export const handler = async (event) => {
     recommendedRoute: it.recommendedRoute,
     estimatedResaleValue: it.estimatedResaleValue,
     nearestWarehouseId: it.nearestWarehouseId,
+    distanceKm: it.distanceKm ?? null,
+    resaleCount: it.resaleCount ?? 0,
     status: it.status,
     purchaseStatus: it.purchaseStatus ?? null,
     buyerUserId: it.buyerUserId ?? null,

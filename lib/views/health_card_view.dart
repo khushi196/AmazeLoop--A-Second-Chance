@@ -3,6 +3,7 @@ import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/report_generator.dart';
 import '../data/repositories/grade_repository.dart';
+import '../data/sustainability.dart' as sustain;
 import 'submit_item_view.dart';
 
 class HealthCardView extends StatelessWidget {
@@ -508,6 +509,10 @@ class HealthCardView extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // ─── Sustainability impact ───
+                _buildSustainabilityCard(e),
                 const SizedBox(height: 24),
 
                 // ─── Action buttons ───
@@ -613,6 +618,134 @@ class HealthCardView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// Sustainability impact card — mirrors the buyer marketplace listing detail
+  /// so the seller sees the same reuse/reverse-logistics estimates. All values
+  /// are transparent approximations.
+  Widget _buildSustainabilityCard(EvaluationInput? e) {
+    if (e == null) return const SizedBox.shrink();
+
+    final manufacturingCo2 = sustain.circularImpactKg(e.category);
+    final hasDistance = e.distanceKm != null;
+    final reverseKm = sustain.reverseShippingAvoidedKm(e.distanceKm);
+    final transportCo2 = sustain.transportCo2SavedKg(e.distanceKm);
+    final owners = 1 + (e.resaleCount ?? 0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.eco_outlined,
+                    color: Colors.green.shade700, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  'Sustainability impact',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _sustainRow(
+            Icons.recycling_outlined,
+            'CO₂ avoided by reuse',
+            '${manufacturingCo2.toStringAsFixed(0)} kg',
+            'Vs. manufacturing a new unit (approx.)',
+          ),
+          if (hasDistance) ...[
+            const SizedBox(height: 16),
+            _sustainRow(
+              Icons.local_shipping_outlined,
+              'Reverse-shipping avoided',
+              '$reverseKm km',
+              'Resold locally instead of returned to origin (approx.)',
+            ),
+            const SizedBox(height: 16),
+            _sustainRow(
+              Icons.co2_outlined,
+              'Transport CO₂ saved',
+              '${transportCo2.toStringAsFixed(1)} kg',
+              'From the avoided reverse leg (approx.)',
+            ),
+          ],
+          const SizedBox(height: 16),
+          _sustainRow(
+            Icons.people_outline,
+            'Owners',
+            owners <= 1 ? '1 (original)' : '$owners total',
+            'Increases each time the item is resold',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sustainRow(
+      IconData icon, String label, String value, String sublabel) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.green.shade700),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Colors.green.shade800,
+          ),
+        ),
+      ],
     );
   }
 
