@@ -50,6 +50,7 @@ class GradeRepository {
   static const String _listingsUrl = '$_baseUrl/listings';
   static const String _purchaseUrl = '$_baseUrl/purchase';
   static const String _purchasesUrl = '$_baseUrl/purchases';
+  static const String _withdrawUrl = '$_baseUrl/listings/withdraw';
   static const String _notificationsUrl = '$_baseUrl/notifications';
   static const String _feedbackUrl = '$_baseUrl/feedback';
 
@@ -379,6 +380,45 @@ class GradeRepository {
   /// to the marketplace.
   Future<Map<String, dynamic>> cancelReservation(String evaluationId) =>
       purchaseListing(evaluationId, action: 'CANCEL');
+
+  /// Seller removes their own listing from the marketplace. If the item is
+  /// currently reserved by a buyer, the backend cancels that reservation
+  /// (freeing the buyer's slot) and notifies them. A SOLD item can't be
+  /// removed (the backend returns 409). Sends the seller's id token when
+  /// available, plus userId in the body to match the public seller routes.
+  Future<Map<String, dynamic>> withdrawListing(String evaluationId) async {
+    final token = Session.idToken;
+    late http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse(_withdrawUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'evaluationId': evaluationId,
+          if (Session.userId != null) 'userId': Session.userId,
+        }),
+      );
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    Map<String, dynamic> decoded = const {};
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      // Status code drives the result.
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    final message = decoded['error']?.toString() ??
+        'Failed to remove listing (${response.statusCode}).';
+    throw Exception(message);
+  }
 
   /// Fetches the authenticated buyer's items, optionally filtered by
   /// [status] ("SOLD" for My Purchases, "RESERVED" for the Reserved tab).

@@ -4,6 +4,7 @@ import 'constants.dart';
 import 'data/models/purchase.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
+import 'widgets/green_credit_badge.dart';
 
 class PurchasesTab extends StatefulWidget {
   const PurchasesTab({super.key});
@@ -269,6 +270,12 @@ class PurchasesTabState extends State<PurchasesTab> {
                 // Status pill
                 _statusPill(p.purchaseStatus),
                 const SizedBox(height: 10),
+
+                // Green credits earned for buying a reused item
+                if (p.greenCreditsEarned > 0) ...[
+                  GreenCreditBadge(credits: p.greenCreditsEarned),
+                  const SizedBox(height: 10),
+                ],
 
                 // Order date
                 Row(

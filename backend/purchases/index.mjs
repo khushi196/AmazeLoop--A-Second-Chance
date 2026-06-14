@@ -64,6 +64,7 @@ function toPurchase(item) {
     purchaseStatus: item.purchaseStatus || "RESERVED",
     purchaseTimestamp: item.purchaseTimestamp || null,
     reservationExpiresAt: item.reservationExpiresAt || null,
+    greenCreditsEarned: Number(item.buyerGreenCreditsEarned) || 0,
   };
 }
 

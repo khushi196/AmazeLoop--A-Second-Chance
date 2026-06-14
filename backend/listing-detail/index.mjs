@@ -63,6 +63,7 @@ function riskBand(reason, condition) {
 
 function isListable(item) {
   if (item.status !== "ROUTED") return false;
+  if (item.marketplaceStatus === "withdrawn") return false;
   const effective = item.chosenDisposition || item.finalDisposition;
   return effective === "Resell";
 }

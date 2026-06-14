@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'data/models/app_notification.dart';
@@ -18,10 +19,23 @@ class NotificationsTabState extends State<NotificationsTab> {
   final GradeRepository _repo = GradeRepository();
   Future<NotificationsResult>? _future;
 
+  // Real-time polling: silently re-checks notifications and only rebuilds when
+  // a new one arrives (e.g. a seller withdrew an item the user had reserved).
+  Timer? _pollTimer;
+  String _shownSignature = '';
+  static const Duration _pollInterval = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
     _maybeLoad();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _pollTick());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   void reload() {
@@ -30,7 +44,32 @@ class NotificationsTabState extends State<NotificationsTab> {
   }
 
   void _maybeLoad() {
-    _future = Session.isSignedIn ? _repo.fetchNotifications() : null;
+    final future = Session.isSignedIn ? _repo.fetchNotifications() : null;
+    _future = future;
+    future?.then((res) {
+      _shownSignature = _signatureOf(res);
+    }).catchError((_) {});
+  }
+
+  /// A cheap fingerprint of the notification feed (count + newest id) so the
+  /// poll can tell when something changed without deep-comparing every item.
+  String _signatureOf(NotificationsResult res) {
+    final first =
+        res.notifications.isNotEmpty ? res.notifications.first.notificationId : '';
+    return '${res.notifications.length}:$first';
+  }
+
+  Future<void> _pollTick() async {
+    if (!mounted || !Session.isSignedIn) return;
+    try {
+      final res = await _repo.fetchNotifications();
+      if (!mounted) return;
+      if (_signatureOf(res) != _shownSignature) {
+        setState(_maybeLoad);
+      }
+    } catch (_) {
+      // Ignore transient poll failures; the next tick retries.
+    }
   }
 
   Future<void> _refresh() async {
@@ -56,6 +95,8 @@ class NotificationsTabState extends State<NotificationsTab> {
         return Icons.person_outline;
       case 'LISTING_RELISTED':
         return Icons.refresh;
+      case 'LISTING_WITHDRAWN':
+        return Icons.remove_shopping_cart_outlined;
       default:
         return Icons.notifications_outlined;
     }
@@ -75,6 +116,8 @@ class NotificationsTabState extends State<NotificationsTab> {
         return Colors.red.shade500;
       case 'LISTING_RELISTED':
         return amazonNavy;
+      case 'LISTING_WITHDRAWN':
+        return Colors.red.shade500;
       default:
         return amazonNavy;
     }

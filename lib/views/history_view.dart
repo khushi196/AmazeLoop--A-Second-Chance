@@ -5,6 +5,7 @@ import '../data/repositories/grade_repository.dart';
 import '../data/route_helpers.dart';
 import '../data/session.dart';
 import '../data/models/evaluation_input.dart';
+import '../widgets/green_credit_badge.dart';
 
 class HistoryView extends StatefulWidget {
   const HistoryView({super.key});
@@ -19,6 +20,84 @@ class _HistoryViewState extends State<HistoryView> {
   List<Map<String, dynamic>> _evaluations = [];
   bool _loading = true;
   String? _error;
+  String? _withdrawingId;
+
+  /// A listing can be removed by its seller while it is live on the
+  /// marketplace and not yet sold (an active reservation is fine — removing it
+  /// cancels the buyer's hold). Already-withdrawn items can't be removed again.
+  bool _canWithdraw(Map<String, dynamic> ev) {
+    final disposition = (ev['chosenDisposition'] ?? ev['finalDisposition'])?.toString();
+    return ev['status']?.toString() == 'ROUTED' &&
+        disposition == 'Resell' &&
+        ev['purchaseStatus']?.toString() != 'SOLD' &&
+        ev['marketplaceStatus']?.toString() != 'withdrawn';
+  }
+
+  Future<void> _withdraw(Map<String, dynamic> ev) async {
+    final id = ev['evaluationId']?.toString();
+    if (id == null) return;
+    final name = ev['productName']?.toString() ?? 'this item';
+    final isReserved = ev['purchaseStatus']?.toString() == 'RESERVED';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Remove listing?',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(
+          isReserved
+              ? '"$name" is currently reserved by a buyer. Removing it will '
+                  'cancel their reservation, free their slot, and notify them. '
+                  'It will also be taken off the marketplace.'
+              : '"$name" will be taken off the marketplace. This can\'t be undone.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    setState(() => _withdrawingId = id);
+    try {
+      final res = await _repo.withdrawListing(id);
+      if (!mounted) return;
+      setState(() => _withdrawingId = null);
+      await _load(); // real-time refresh of the seller's own view
+      if (!mounted) return;
+      final releasedBuyer = res['releasedBuyer'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade700,
+          content: Text(releasedBuyer
+              ? '"$name" removed. The buyer\'s reservation was cancelled and they were notified.'
+              : '"$name" removed from the marketplace.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _withdrawingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -72,6 +151,11 @@ class _HistoryViewState extends State<HistoryView> {
 
     if (status != 'ROUTED') {
       return (label: 'Pending', fg: Colors.grey.shade600, bg: Colors.grey.shade100);
+    }
+
+    // Seller pulled it from the marketplace.
+    if (ev['marketplaceStatus']?.toString() == 'withdrawn') {
+      return (label: 'Removed', fg: Colors.grey.shade700, bg: Colors.grey.shade200);
     }
 
     if (disposition == 'Recycle') {
@@ -267,6 +351,7 @@ class _HistoryViewState extends State<HistoryView> {
               DataColumn(label: _HeaderCell('CONDITION')),
               DataColumn(label: _HeaderCell('ROUTE')),
               DataColumn(label: _HeaderCell('RESALE VALUE')),
+              DataColumn(label: _HeaderCell('REWARD')),
               DataColumn(label: _HeaderCell('STATUS')),
               DataColumn(label: _HeaderCell('MARKETPLACE')),
               DataColumn(label: _HeaderCell('')), // feedback icon column
@@ -390,6 +475,23 @@ class _HistoryViewState extends State<HistoryView> {
                     ),
                   ),
 
+                  // Green credits reward earned for routing this item
+                  DataCell(
+                    Builder(builder: (_) {
+                      final credits =
+                          (ev['greenCreditsEarned'] as num?)?.toInt() ?? 0;
+                      return credits > 0
+                          ? GreenCreditBadge(credits: credits, compact: true)
+                          : Text(
+                              '—',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade400,
+                              ),
+                            );
+                    }),
+                  ),
+
                   // Status badge
                   DataCell(
                     Container(
@@ -437,43 +539,80 @@ class _HistoryViewState extends State<HistoryView> {
 
                   // Action
                   DataCell(
-                    InkWell(
-                      onTap: () {
-                        final photos = (ev['photoUrls'] as List?)?.map((e) => e.toString()).toList();
-                        final e = EvaluationInput(
-                          evaluationId: ev['evaluationId']?.toString(),
-                          productName: ev['productName']?.toString(),
-                          category: ev['category']?.toString(),
-                          reason: ev['reason']?.toString(),
-                          condition: condition,
-                          conditionReason: ev['conditionReason']?.toString(),
-                          estimatedResaleValue: resale,
-                          finalDisposition: ev['finalDisposition']?.toString(),
-                          chosenDisposition: ev['chosenDisposition']?.toString(),
-                          recommendedRoute: ev['recommendedRoute']?.toString(),
-                          nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
-                          photoUrls: photos,
-                          bestPhotoIndex: ev['bestPhotoIndex'] as int?,
-                          distanceKm: ev['distanceKm'] as num?,
-                          resaleCount: (ev['resaleCount'] as num?)?.toInt(),
-                        );
-                        context.push('/seller/history/health', extra: e);
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'View HealthCard',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.blue.shade700,
-                            ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            final photos = (ev['photoUrls'] as List?)?.map((e) => e.toString()).toList();
+                            final e = EvaluationInput(
+                              evaluationId: ev['evaluationId']?.toString(),
+                              productName: ev['productName']?.toString(),
+                              category: ev['category']?.toString(),
+                              reason: ev['reason']?.toString(),
+                              condition: condition,
+                              conditionReason: ev['conditionReason']?.toString(),
+                              estimatedResaleValue: resale,
+                              finalDisposition: ev['finalDisposition']?.toString(),
+                              chosenDisposition: ev['chosenDisposition']?.toString(),
+                              recommendedRoute: ev['recommendedRoute']?.toString(),
+                              nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
+                              photoUrls: photos,
+                              bestPhotoIndex: ev['bestPhotoIndex'] as int?,
+                              distanceKm: ev['distanceKm'] as num?,
+                              resaleCount: (ev['resaleCount'] as num?)?.toInt(),
+                            );
+                            context.push('/seller/history/health', extra: e);
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'View HealthCard',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right, size: 18, color: Colors.blue.shade700),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.chevron_right, size: 18, color: Colors.blue.shade700),
+                        ),
+                        if (_canWithdraw(ev)) ...[
+                          const SizedBox(width: 12),
+                          _withdrawingId == ev['evaluationId']?.toString()
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.red.shade400),
+                                )
+                              : Tooltip(
+                                  message: 'Remove this listing from the marketplace',
+                                  child: InkWell(
+                                    onTap: () => _withdraw(ev),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.delete_outline,
+                                            size: 16, color: Colors.red.shade600),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Remove',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ],

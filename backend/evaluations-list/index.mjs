@@ -93,10 +93,12 @@ export const handler = async (event) => {
     distanceKm: it.distanceKm ?? null,
     resaleCount: it.resaleCount ?? 0,
     status: it.status,
+    marketplaceStatus: it.marketplaceStatus ?? null,
     purchaseStatus: it.purchaseStatus ?? null,
     buyerUserId: it.buyerUserId ?? null,
     feedbackFlag: it.feedbackFlag ?? false,
     feedbackType: it.feedbackType ?? null,
+    greenCreditsEarned: it.greenCreditsEarned ?? 0,
     photoUrls: it.photoUrls,
     bestPhotoIndex: it.bestPhotoIndex,
   }));

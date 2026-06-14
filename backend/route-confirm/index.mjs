@@ -13,6 +13,7 @@ import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-r
 
 const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
+const PROFILES_TABLE = process.env.PROFILES_TABLE || "UserProfiles";
 // Best available model that works without the Anthropic use-case form.
 const MODEL_ID = process.env.BEDROCK_MODEL_ID || "apac.amazon.nova-pro-v1:0";
 
@@ -24,6 +25,43 @@ const VALID_DISPOSITIONS = ["Resell", "Refurbish", "Recycle", "ReturnToOrigin", 
 /** True if [d] is an accepted final disposition. Exported for unit tests. */
 export function isValidDisposition(d) {
   return VALID_DISPOSITIONS.includes(d);
+}
+
+/**
+ * Green credits a seller earns for giving an item a second life, weighted by
+ * how sustainable the chosen disposition is. Small numbers on purpose — they
+ * map to the tier ladder in the profile function (Seedling/Sapling/...).
+ * Exported for unit tests.
+ */
+export function greenCreditsForDisposition(d) {
+  switch (d) {
+    case "Donate": return 20;
+    case "Refurbish": return 15;
+    case "Recycle": return 12;
+    case "Resell": return 10;
+    case "ReturnToOrigin": return 5;
+    default: return 10;
+  }
+}
+
+/**
+ * Best-effort increment of a user's lifetime green-credit total. Never throws,
+ * so awarding credits can never break the routing workflow.
+ */
+async function addProfileCredits(userId, credits) {
+  if (!userId || !credits || credits <= 0) return;
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: PROFILES_TABLE,
+        Key: { userId },
+        UpdateExpression: "SET updatedAt = :t ADD greenCredits :c",
+        ExpressionAttributeValues: { ":c": credits, ":t": new Date().toISOString() },
+      })
+    );
+  } catch (e) {
+    console.error(`profile credit add failed for ${userId}: ${e.message}`);
+  }
 }
 
 function response(statusCode, body) {
@@ -128,6 +166,8 @@ export const handler = async (event) => {
     newRouteReason = await explainChosenRoute(item, chosenDisposition);
   }
 
+  let sellerCredits = 0;
+
   // Persist the chosen disposition + override flag + routed status. For
   // ReturnToOrigin we additionally stamp marketplaceStatus = "not_listed"
   // so the record carries the internal-transfer signal explicitly. When an
@@ -155,6 +195,14 @@ export const handler = async (event) => {
       exprValues[":rr"] = newRouteReason;
     }
 
+    // Award green credits once, the first time this item is routed. Stored on
+    // the evaluation so the seller's grading history can show "you earned X".
+    if (item.greenCreditsEarned == null) {
+      sellerCredits = greenCreditsForDisposition(chosenDisposition);
+      setParts.push("greenCreditsEarned = :gc");
+      exprValues[":gc"] = sellerCredits;
+    }
+
     await ddb.send(
       new UpdateCommand({
         TableName: EVALUATIONS_TABLE,
@@ -168,11 +216,18 @@ export const handler = async (event) => {
     return response(500, { error: "Failed to save chosen disposition.", detail: e.message });
   }
 
+  // Best-effort: add the earned credits to the seller's lifetime total. Never
+  // blocks or fails the routing response.
+  if (sellerCredits > 0 && item.userId) {
+    await addProfileCredits(item.userId, sellerCredits);
+  }
+
   return response(200, {
     evaluationId,
     chosenDisposition,
     finalDisposition,
     isOverride,
     routeReason: newRouteReason,
+    greenCreditsEarned: sellerCredits > 0 ? sellerCredits : (item.greenCreditsEarned ?? 0),
   });
 };

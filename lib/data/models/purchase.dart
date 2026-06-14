@@ -10,6 +10,7 @@ class Purchase {
   final String purchaseStatus;
   final DateTime? purchaseTimestamp;
   final DateTime? reservationExpiresAt;
+  final int greenCreditsEarned;
 
   const Purchase({
     required this.evaluationId,
@@ -21,6 +22,7 @@ class Purchase {
     required this.purchaseStatus,
     this.purchaseTimestamp,
     this.reservationExpiresAt,
+    this.greenCreditsEarned = 0,
   });
 
   factory Purchase.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class Purchase {
       purchaseStatus: (json['purchaseStatus'] ?? 'RESERVED').toString(),
       purchaseTimestamp: _parseDate(json['purchaseTimestamp']),
       reservationExpiresAt: _parseDate(json['reservationExpiresAt']),
+      greenCreditsEarned: (json['greenCreditsEarned'] as num?)?.toInt() ?? 0,
     );
   }
 

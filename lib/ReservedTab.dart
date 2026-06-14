@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'constants.dart';
@@ -21,10 +23,24 @@ class ReservedTabState extends State<ReservedTab> {
   String? _buyingId;
   String? _cancelId;
 
+  // Real-time polling: silently re-checks reservations and only rebuilds the
+  // list when the set actually changes (e.g. a seller removed a reserved
+  // item), so there's no spinner flicker while nothing is happening.
+  Timer? _pollTimer;
+  Set<String> _shownIds = {};
+  static const Duration _pollInterval = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
     _maybeLoad();
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _pollTick());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   void reload() {
@@ -33,9 +49,29 @@ class ReservedTabState extends State<ReservedTab> {
   }
 
   void _maybeLoad() {
-    _future = Session.isSignedIn
-        ? _repo.fetchPurchases(status: 'RESERVED')
-        : null;
+    final future =
+        Session.isSignedIn ? _repo.fetchPurchases(status: 'RESERVED') : null;
+    _future = future;
+    // Track which items are currently shown so the poll can detect changes.
+    future?.then((list) {
+      _shownIds = list.map((p) => p.evaluationId).toSet();
+    }).catchError((_) {});
+  }
+
+  /// Background check — if the buyer's active reservations changed on the
+  /// server (e.g. the seller withdrew one), refresh the list in place.
+  Future<void> _pollTick() async {
+    if (!mounted || !Session.isSignedIn) return;
+    try {
+      final list = await _repo.fetchPurchases(status: 'RESERVED');
+      if (!mounted) return;
+      final ids = list.map((p) => p.evaluationId).toSet();
+      if (!setEquals(ids, _shownIds)) {
+        setState(_maybeLoad);
+      }
+    } catch (_) {
+      // Ignore transient poll failures; the next tick retries.
+    }
   }
 
   Future<void> _refresh() async {

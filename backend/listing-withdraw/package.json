@@ -1,0 +1,11 @@
+{
+  "name": "amazeloop-listing-withdraw",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AmazeLoop seller listing withdrawal Lambda",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.637.0",
+    "@aws-sdk/lib-dynamodb": "^3.637.0"
+  }
+}

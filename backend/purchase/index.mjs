@@ -31,8 +31,11 @@ import { randomUUID } from "crypto";
 const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
 const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE || "AmazeLoopNotifications";
+const PROFILES_TABLE = process.env.PROFILES_TABLE || "UserProfiles";
 const RESERVATION_HOURS = Number(process.env.RESERVATION_HOURS || 24);
 const MAX_ACTIVE_RESERVATIONS = 5;
+// Green credits a buyer earns for choosing a reused item over buying new.
+const BUYER_GREEN_CREDITS = Number(process.env.BUYER_GREEN_CREDITS || 10);
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 
@@ -69,6 +72,26 @@ async function notify(userId, type, title, bodyText, evaluationId) {
     );
   } catch (e) {
     console.error(`notify failed: ${e.message}`);
+  }
+}
+
+/**
+ * Best-effort increment of a buyer's lifetime green-credit total. Never throws,
+ * so awarding credits can never break the purchase workflow.
+ */
+async function addProfileCredits(userId, credits) {
+  if (!userId || !credits || credits <= 0) return;
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: PROFILES_TABLE,
+        Key: { userId },
+        UpdateExpression: "SET updatedAt = :t ADD greenCredits :c",
+        ExpressionAttributeValues: { ":c": credits, ":t": new Date().toISOString() },
+      })
+    );
+  } catch (e) {
+    console.error(`profile credit add failed for ${userId}: ${e.message}`);
   }
 }
 
@@ -141,7 +164,11 @@ export const handler = async (event) => {
   }
 
   const effectiveDisposition = item.chosenDisposition || item.finalDisposition;
-  if (item.status !== "ROUTED" || effectiveDisposition !== "Resell") {
+  if (
+    item.status !== "ROUTED" ||
+    effectiveDisposition !== "Resell" ||
+    item.marketplaceStatus === "withdrawn"
+  ) {
     return response(400, { error: "This item is not available." });
   }
 
@@ -232,13 +259,29 @@ export const handler = async (event) => {
   // BUY
   // -------------------------------------------------------------------------
   if (action === "BUY") {
+    // Award green credits once, the first time this item is bought. Stored on
+    // the evaluation so the buyer's "My Purchases" can show "you earned X".
+    const buyerCredits =
+      item.buyerGreenCreditsEarned == null ? BUYER_GREEN_CREDITS : 0;
+    const setClause =
+      "buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t" +
+      (buyerCredits > 0 ? ", buyerGreenCreditsEarned = :gc" : "");
+    const buyValues = {
+      ":b": buyerUserId,
+      ":ps": "SOLD",
+      ":t": nowIso,
+      ":now": nowIso,
+      ":one": 1,
+    };
+    if (buyerCredits > 0) buyValues[":gc"] = buyerCredits;
+
     try {
       await ddb.send(
         new UpdateCommand({
           TableName: EVALUATIONS_TABLE,
           Key: { evaluationId },
           UpdateExpression:
-            "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t REMOVE reservationExpiresAt ADD resaleCount :one",
+            "SET " + setClause + " REMOVE reservationExpiresAt ADD resaleCount :one",
           // Atomic guard (mirrors RESERVE and buyConditionSatisfied()): the
           // item is claimable only if it is free, already ours, or a prior
           // reservation has expired. Crucially this does NOT allow buying an
@@ -246,13 +289,7 @@ export const handler = async (event) => {
           // read-then-write race the previous `purchaseStatus <> :sold` left open.
           ConditionExpression:
             "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR reservationExpiresAt < :now",
-          ExpressionAttributeValues: {
-            ":b": buyerUserId,
-            ":ps": "SOLD",
-            ":t": nowIso,
-            ":now": nowIso,
-            ":one": 1,
-          },
+          ExpressionAttributeValues: buyValues,
         })
       );
     } catch (e) {
@@ -269,6 +306,11 @@ export const handler = async (event) => {
       `Your purchase of "${title}" is confirmed.`,
       evaluationId
     );
+
+    // Best-effort: add the earned credits to the buyer's lifetime total.
+    if (buyerCredits > 0) {
+      await addProfileCredits(buyerUserId, buyerCredits);
+    }
 
     // Notify the seller too — but only if we're not the seller ourselves.
     if (item.userId && item.userId !== buyerUserId) {
@@ -287,6 +329,8 @@ export const handler = async (event) => {
       purchaseStatus: "SOLD",
       purchaseTimestamp: nowIso,
       converted: ownActiveReservation,
+      greenCreditsEarned:
+        buyerCredits > 0 ? buyerCredits : (item.buyerGreenCreditsEarned ?? 0),
     });
   }
 

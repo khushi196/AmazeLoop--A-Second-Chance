@@ -72,6 +72,9 @@ export function isListable(item) {
   const effective = item.chosenDisposition || item.finalDisposition;
   if (effective !== "Resell") return false;
 
+  // Seller has pulled it from the marketplace → never listable.
+  if (item.marketplaceStatus === "withdrawn") return false;
+
   // No buyer at all → listable.
   if (!item.buyerUserId) return true;
 
