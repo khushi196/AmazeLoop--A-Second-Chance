@@ -6,10 +6,7 @@ import '../data/report_generator.dart';
 
 class GradingResultView extends StatelessWidget {
   final EvaluationInput? evaluation;
-  const GradingResultView({
-    super.key,
-    this.evaluation,
-  });
+  const GradingResultView({super.key, this.evaluation});
 
   String _formatPrice(num? value, String currency) {
     if (value == null || value == 0) return 'N/A — Recycle';
@@ -91,10 +88,7 @@ class GradingResultView extends StatelessWidget {
                   Text(
                     e?.productName ?? 'Item graded successfully',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 20),
 
@@ -125,7 +119,10 @@ class GradingResultView extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: amazonNavy.withValues(alpha: 0.2), width: 1.5),
+                      border: Border.all(
+                        color: amazonNavy.withValues(alpha: 0.2),
+                        width: 1.5,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,7 +140,11 @@ class GradingResultView extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            Icon(Icons.info_outline, size: 16, color: Colors.grey.shade400),
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Colors.grey.shade400,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -179,7 +180,8 @@ class GradingResultView extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // ─── Condition reasoning ───
-                  if (e?.conditionReason != null && e!.conditionReason!.isNotEmpty)
+                  if (e?.conditionReason != null &&
+                      e!.conditionReason!.isNotEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -194,7 +196,9 @@ class GradingResultView extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF00687A).withValues(alpha: 0.1),
+                              color: const Color(
+                                0xFF00687A,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -248,7 +252,9 @@ class GradingResultView extends StatelessWidget {
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Grading complete. Open the History tab to view results.'),
+                                  content: Text(
+                                    'Grading complete. Open the History tab to view results.',
+                                  ),
                                 ),
                               );
                             }
@@ -282,9 +288,13 @@ class GradingResultView extends StatelessWidget {
                                     await ReportGenerator.downloadReport(e);
                                   } catch (err) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
-                                          content: Text('Could not generate report: $err'),
+                                          content: Text(
+                                            'Could not generate report: $err',
+                                          ),
                                         ),
                                       );
                                     }
@@ -302,7 +312,10 @@ class GradingResultView extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             foregroundColor: textPrimary,
-                            side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                            side: BorderSide(
+                              color: Colors.grey.shade400,
+                              width: 1.5,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -327,12 +340,45 @@ class GradingResultView extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           // Confetti dots
-          Positioned(top: 10, left: 60, child: _confettiDot(amazonNavy.withValues(alpha: 0.6), 6)),
-          Positioned(top: 5, left: 90, child: _confettiDot(const Color(0xFF00687A).withValues(alpha: 0.4), 4)),
-          Positioned(top: 15, right: 60, child: _confettiDot(amazonNavy.withValues(alpha: 0.5), 5)),
-          Positioned(top: 8, right: 85, child: _confettiDot(const Color(0xFF00687A).withValues(alpha: 0.3), 4)),
-          Positioned(top: 25, left: 75, child: _confettiDot(const Color(0xFF00687A).withValues(alpha: 0.5), 3)),
-          Positioned(top: 20, right: 70, child: _confettiDot(amazonNavy.withValues(alpha: 0.4), 4)),
+          Positioned(
+            top: 10,
+            left: 60,
+            child: _confettiDot(amazonNavy.withValues(alpha: 0.6), 6),
+          ),
+          Positioned(
+            top: 5,
+            left: 90,
+            child: _confettiDot(
+              const Color(0xFF00687A).withValues(alpha: 0.4),
+              4,
+            ),
+          ),
+          Positioned(
+            top: 15,
+            right: 60,
+            child: _confettiDot(amazonNavy.withValues(alpha: 0.5), 5),
+          ),
+          Positioned(
+            top: 8,
+            right: 85,
+            child: _confettiDot(
+              const Color(0xFF00687A).withValues(alpha: 0.3),
+              4,
+            ),
+          ),
+          Positioned(
+            top: 25,
+            left: 75,
+            child: _confettiDot(
+              const Color(0xFF00687A).withValues(alpha: 0.5),
+              3,
+            ),
+          ),
+          Positioned(
+            top: 20,
+            right: 70,
+            child: _confettiDot(amazonNavy.withValues(alpha: 0.4), 4),
+          ),
           // Main check icon
           Container(
             width: 64,
@@ -356,10 +402,7 @@ class GradingResultView extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 
@@ -389,22 +432,52 @@ class GradingResultView extends StatelessWidget {
     // Left column
     leftItems.add(_DetailItem(Icons.history, 'Reason', e?.reason ?? '—'));
     if (e?.orderId != null) {
-      leftItems.add(_DetailItem(Icons.inventory_2_outlined, 'Order ID', e!.orderId!));
+      leftItems.add(
+        _DetailItem(Icons.inventory_2_outlined, 'Order ID', e!.orderId!),
+      );
     }
     if (e?.normalizedPrice != null) {
-      leftItems.add(_DetailItem(Icons.sell_outlined, 'Normalized price', _formatPrice(e?.normalizedPrice, currency)));
+      leftItems.add(
+        _DetailItem(
+          Icons.sell_outlined,
+          'Normalized price',
+          _formatPrice(e?.normalizedPrice, currency),
+        ),
+      );
     }
     if (e?.avgPrice != null) {
-      leftItems.add(_DetailItem(Icons.bar_chart_outlined, 'Category average', _formatPrice(e?.avgPrice, currency)));
+      leftItems.add(
+        _DetailItem(
+          Icons.bar_chart_outlined,
+          'Category average',
+          _formatPrice(e?.avgPrice, currency),
+        ),
+      );
     }
-    leftItems.add(_DetailItem(Icons.sort_outlined, 'Sorting queue', e?.sortingQueue ?? '—'));
+    leftItems.add(
+      _DetailItem(Icons.sort_outlined, 'Sorting queue', e?.sortingQueue ?? '—'),
+    );
 
     // Right column
     if (e?.evaluationId != null) {
-      rightItems.add(_DetailItem(Icons.verified_outlined, 'Evaluation ID', e!.evaluationId!));
+      rightItems.add(
+        _DetailItem(Icons.verified_outlined, 'Evaluation ID', e!.evaluationId!),
+      );
     }
-    rightItems.add(_DetailItem(Icons.calendar_today_outlined, 'Graded on', _formatDate(DateTime.now())));
-    rightItems.add(_DetailItem(Icons.smartphone_outlined, 'Model', e?.productName?.split(' ').take(2).join(' ') ?? '—'));
+    rightItems.add(
+      _DetailItem(
+        Icons.calendar_today_outlined,
+        'Graded on',
+        _formatDate(DateTime.now()),
+      ),
+    );
+    rightItems.add(
+      _DetailItem(
+        Icons.smartphone_outlined,
+        'Model',
+        e?.productName?.split(' ').take(2).join(' ') ?? '—',
+      ),
+    );
     rightItems.add(_DetailItem(Icons.storage_outlined, 'Storage', '—'));
     rightItems.add(_DetailItem(Icons.circle, 'Color', '—'));
 
@@ -427,7 +500,20 @@ class GradingResultView extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final ampm = date.hour >= 12 ? 'PM' : 'AM';
     return '${date.day} ${months[date.month - 1]} ${date.year}, ${hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} $ampm';
@@ -443,10 +529,7 @@ class GradingResultView extends StatelessWidget {
           Expanded(
             child: Text(
               item.label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
           Flexible(

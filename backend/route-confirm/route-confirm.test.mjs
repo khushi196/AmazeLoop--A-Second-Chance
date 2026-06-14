@@ -9,7 +9,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidDisposition } from "./index.mjs";
+import { isValidDisposition, greenCreditsForDisposition } from "./index.mjs";
 
 test("accepts the five valid dispositions", () => {
   for (const d of ["Resell", "Refurbish", "Recycle", "ReturnToOrigin", "Donate"]) {
@@ -21,4 +21,12 @@ test("rejects unknown or malformed dispositions", () => {
   for (const d of ["resell", "DONATE", "Sell", "", null, undefined, "Frobnicate"]) {
     assert.equal(isValidDisposition(d), false, `${String(d)} should be invalid`);
   }
+});
+
+test("maps each disposition to its green-credit reward", () => {
+  assert.equal(greenCreditsForDisposition("Donate"), 20);
+  assert.equal(greenCreditsForDisposition("Refurbish"), 15);
+  assert.equal(greenCreditsForDisposition("Recycle"), 12);
+  assert.equal(greenCreditsForDisposition("Resell"), 10);
+  assert.equal(greenCreditsForDisposition("ReturnToOrigin"), 5);
 });

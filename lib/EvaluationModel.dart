@@ -38,9 +38,12 @@ class Evaluation {
       finalDisposition: json['finalDisposition'] ?? '',
       chosenDisposition: json['chosenDisposition'],
       recommendedRoute: json['recommendedRoute'] ?? '',
-      estimatedResaleValue: (json['estimatedResaleValue'] as num?)?.toDouble() ?? 0.0,
+      estimatedResaleValue:
+          (json['estimatedResaleValue'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? 'PENDING',
-      photoUrls: json['photoUrls'] != null ? List<String>.from(json['photoUrls']) : [],
+      photoUrls: json['photoUrls'] != null
+          ? List<String>.from(json['photoUrls'])
+          : [],
     );
   }
 }

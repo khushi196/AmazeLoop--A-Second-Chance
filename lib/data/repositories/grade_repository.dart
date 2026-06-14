@@ -123,7 +123,9 @@ class GradeRepository {
     try {
       decoded = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
-      throw Exception('Unexpected response from server (${response.statusCode}).');
+      throw Exception(
+        'Unexpected response from server (${response.statusCode}).',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -133,7 +135,9 @@ class GradeRepository {
       }
       throw Exception('Malformed response: missing evaluationInput.');
     } else {
-      final message = decoded['error']?.toString() ?? 'Grading failed (${response.statusCode}).';
+      final message =
+          decoded['error']?.toString() ??
+          'Grading failed (${response.statusCode}).';
       throw Exception(message);
     }
   }
@@ -156,13 +160,17 @@ class GradeRepository {
     try {
       decoded = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
-      throw Exception('Unexpected response from AI grading (${response.statusCode}).');
+      throw Exception(
+        'Unexpected response from AI grading (${response.statusCode}).',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return AiGradeResult.fromJson(decoded);
     } else {
-      final message = decoded['error']?.toString() ?? 'AI grading failed (${response.statusCode}).';
+      final message =
+          decoded['error']?.toString() ??
+          'AI grading failed (${response.statusCode}).';
       throw Exception(message);
     }
   }
@@ -185,25 +193,35 @@ class GradeRepository {
     try {
       decoded = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
-      throw Exception('Unexpected response from routing (${response.statusCode}).');
+      throw Exception(
+        'Unexpected response from routing (${response.statusCode}).',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return RouteResult.fromJson(decoded);
     } else {
-      final message = decoded['error']?.toString() ?? 'Routing failed (${response.statusCode}).';
+      final message =
+          decoded['error']?.toString() ??
+          'Routing failed (${response.statusCode}).';
       throw Exception(message);
     }
   }
 
   /// Confirms the user's chosen disposition (possibly an override).
-  Future<bool> confirmRoute(String evaluationId, String chosenDisposition) async {
+  Future<bool> confirmRoute(
+    String evaluationId,
+    String chosenDisposition,
+  ) async {
     late http.Response response;
     try {
       response = await http.post(
         Uri.parse(_routeConfirmUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'evaluationId': evaluationId, 'chosenDisposition': chosenDisposition}),
+        body: jsonEncode({
+          'evaluationId': evaluationId,
+          'chosenDisposition': chosenDisposition,
+        }),
       );
     } catch (e) {
       throw Exception('Network error: $e');
@@ -213,19 +231,27 @@ class GradeRepository {
     try {
       decoded = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
-      throw Exception('Unexpected response from confirm (${response.statusCode}).');
+      throw Exception(
+        'Unexpected response from confirm (${response.statusCode}).',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded['isOverride'] == true;
     } else {
-      final message = decoded['error']?.toString() ?? 'Confirm failed (${response.statusCode}).';
+      final message =
+          decoded['error']?.toString() ??
+          'Confirm failed (${response.statusCode}).';
       throw Exception(message);
     }
   }
 
   /// Fetches the evaluation history for a userId (or warehouseId for seller view).
-  Future<List<Map<String, dynamic>>> listEvaluations({String? userId, String? warehouseId, int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> listEvaluations({
+    String? userId,
+    String? warehouseId,
+    int limit = 20,
+  }) async {
     final params = <String, String>{'limit': '$limit'};
     if (userId != null) params['userId'] = userId;
     if (warehouseId != null) params['warehouseId'] = warehouseId;
@@ -233,7 +259,10 @@ class GradeRepository {
     final uri = Uri.parse(_evaluationsUrl).replace(queryParameters: params);
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -248,12 +277,15 @@ class GradeRepository {
 
   /// Fetches the public marketplace feed of items routed for resale.
   Future<List<Listing>> fetchListings({int limit = 50}) async {
-    final uri = Uri.parse(_listingsUrl).replace(
-      queryParameters: {'limit': '$limit'},
-    );
+    final uri = Uri.parse(
+      _listingsUrl,
+    ).replace(queryParameters: {'limit': '$limit'});
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -273,13 +305,19 @@ class GradeRepository {
   /// Fetches one page of the public marketplace feed for "Load more"
   /// pagination. Returns the page plus whether more items remain and the
   /// offset to request next.
-  Future<ListingsPage> fetchListingsPage({int limit = 50, int offset = 0}) async {
-    final uri = Uri.parse(_listingsUrl).replace(
-      queryParameters: {'limit': '$limit', 'offset': '$offset'},
-    );
+  Future<ListingsPage> fetchListingsPage({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final uri = Uri.parse(
+      _listingsUrl,
+    ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -293,7 +331,8 @@ class GradeRepository {
           .toList();
       final hasMore = decoded['hasMore'] == true;
       final nextOffset =
-          (decoded['nextOffset'] as num?)?.toInt() ?? (offset + listings.length);
+          (decoded['nextOffset'] as num?)?.toInt() ??
+          (offset + listings.length);
       return ListingsPage(
         listings: listings,
         hasMore: hasMore,
@@ -309,7 +348,10 @@ class GradeRepository {
     final uri = Uri.parse('$_listingsUrl/${Uri.encodeComponent(listingId)}');
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -357,7 +399,8 @@ class GradeRepository {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-    final message = decoded['error']?.toString() ??
+    final message =
+        decoded['error']?.toString() ??
         'Failed to ${action.toLowerCase()} listing (${response.statusCode}).';
     // A 409 means another buyer won the race for this item (the backend's
     // conditional write rejected ours). Surface it as a typed exception so the
@@ -415,14 +458,18 @@ class GradeRepository {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-    final message = decoded['error']?.toString() ??
+    final message =
+        decoded['error']?.toString() ??
         'Failed to remove listing (${response.statusCode}).';
     throw Exception(message);
   }
 
   /// Fetches the authenticated buyer's items, optionally filtered by
   /// [status] ("SOLD" for My Purchases, "RESERVED" for the Reserved tab).
-  Future<List<Purchase>> fetchPurchases({String? status, int limit = 50}) async {
+  Future<List<Purchase>> fetchPurchases({
+    String? status,
+    int limit = 50,
+  }) async {
     final token = Session.idToken;
     final uri = Uri.parse(_purchasesUrl).replace(
       queryParameters: {
@@ -432,10 +479,13 @@ class GradeRepository {
     );
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      });
+      response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -457,15 +507,18 @@ class GradeRepository {
   /// Fetches the authenticated user's in-app notifications.
   Future<NotificationsResult> fetchNotifications({int limit = 50}) async {
     final token = Session.idToken;
-    final uri = Uri.parse(_notificationsUrl).replace(
-      queryParameters: {'limit': '$limit'},
-    );
+    final uri = Uri.parse(
+      _notificationsUrl,
+    ).replace(queryParameters: {'limit': '$limit'});
     late http.Response response;
     try {
-      response = await http.get(uri, headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      });
+      response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
     } catch (e) {
       throw Exception('Network error: $e');
     }

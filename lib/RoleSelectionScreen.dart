@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'constants.dart';
+import 'widgets/amazeloop_mascot.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -21,7 +22,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 48,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -37,7 +41,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // ─── Mascot illustration ───
-                    _buildMascot(),
+                    const AmazeLoopMascot(),
                     const SizedBox(height: 24),
 
                     // ─── Logo text ───
@@ -49,8 +53,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                           letterSpacing: -0.5,
                         ),
                         children: [
-                          TextSpan(text: 'Amaze', style: TextStyle(color: amazonNavy)),
-                          TextSpan(text: 'Loop', style: TextStyle(color: amazonOrange)),
+                          TextSpan(
+                            text: 'Amaze',
+                            style: TextStyle(color: amazonNavy),
+                          ),
+                          TextSpan(
+                            text: 'Loop',
+                            style: TextStyle(color: amazonOrange),
+                          ),
                         ],
                       ),
                     ),
@@ -114,25 +124,47 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.verified_user_outlined, size: 18, color: Colors.grey.shade500),
+                        Icon(
+                          Icons.verified_user_outlined,
+                          size: 18,
+                          color: Colors.grey.shade500,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Secure',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         const SizedBox(width: 16),
-                        Text('•', style: TextStyle(color: Colors.grey.shade400)),
+                        Text(
+                          '•',
+                          style: TextStyle(color: Colors.grey.shade400),
+                        ),
                         const SizedBox(width: 16),
                         Text(
                           'Transparent',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         const SizedBox(width: 16),
-                        Text('•', style: TextStyle(color: Colors.grey.shade400)),
+                        Text(
+                          '•',
+                          style: TextStyle(color: Colors.grey.shade400),
+                        ),
                         const SizedBox(width: 16),
                         Text(
                           'Trusted',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -142,115 +174,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Mascot — cardboard box with recycle arrows, sparkles, and leaves
-  // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildMascot() {
-    return SizedBox(
-      height: 100,
-      width: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Sparkles (decorative dots)
-          Positioned(
-            top: 0,
-            left: 20,
-            child: Icon(Icons.auto_awesome, size: 14, color: amazonOrange.withValues(alpha: 0.7)),
-          ),
-          Positioned(
-            top: 8,
-            right: 15,
-            child: Icon(Icons.auto_awesome, size: 10, color: amazonOrange.withValues(alpha: 0.5)),
-          ),
-          // Recycle arrows above box
-          Positioned(
-            top: 5,
-            child: Icon(Icons.sync, size: 28, color: amazonNavy),
-          ),
-          // Box icon (main mascot)
-          Positioned(
-            bottom: 0,
-            child: Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8C99B),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFD4A76A), width: 2),
-              ),
-              child: Stack(
-                children: [
-                  // Tape strip
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF4A6572),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
-                      ),
-                    ),
-                  ),
-                  // Face - eyes
-                  Positioned(
-                    top: 28,
-                    left: 18,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF333333),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 28,
-                    right: 18,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF333333),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  // Face - smile
-                  Positioned(
-                    bottom: 16,
-                    left: 22,
-                    right: 22,
-                    child: Container(
-                      height: 12,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: const Color(0xFF333333), width: 2),
-                          left: BorderSide(color: const Color(0xFF333333), width: 2),
-                          right: BorderSide(color: const Color(0xFF333333), width: 2),
-                        ),
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Leaf on right
-          Positioned(
-            bottom: 20,
-            right: 0,
-            child: Icon(Icons.eco, size: 24, color: Colors.green.shade400),
-          ),
-        ],
       ),
     );
   }
@@ -345,7 +268,11 @@ class _HoverableRoleCardState extends State<_HoverableRoleCard> {
                     child: Icon(widget.icon, size: 24, color: Colors.white),
                   ),
                   // Arrow
-                  Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey.shade400,
+                    size: 24,
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

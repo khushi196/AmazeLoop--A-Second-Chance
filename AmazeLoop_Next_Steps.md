@@ -18,7 +18,7 @@ User Login (Cognito) → Grade New Item → AI Vision Grading → Routing Decisi
 - 5 Lambda functions chained via DynamoDB shared state (`/upload-url`, `/grade`, `/ai-grade`, `/route`, `/route/confirm`)
 - Evaluation history per user via `GET /evaluations?userId=xxx`
 - Presigned S3 uploads for condition photos
-- Amazon Bedrock (Nova Lite) vision grading with structured condition scoring
+- Amazon Bedrock (Nova Pro) vision grading with structured condition scoring
 - Haversine routing to nearest warehouse hub
 - Flutter seller dashboard with full UI and API integration
 - Cognito authentication (email/password, custom `role` attribute)

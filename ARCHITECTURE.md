@@ -20,8 +20,8 @@ Flutter Web (Chrome)
 API Gateway HTTP API  ──────►  Cognito User Pool (email/password, custom:role)
    │  AWS_PROXY
    ▼
-AWS Lambda (Node.js, ESM) — 13 functions
-   ├── DynamoDB  (Evaluations, ProductsCatalog, AmazeLoopNotifications)
+AWS Lambda (Node.js, ESM) — 14 functions
+   ├── DynamoDB  (Evaluations, ProductsCatalog, AmazeLoopNotifications, UserProfiles)
    ├── Amazon S3 (product photos via presigned PUT)
    └── Amazon Bedrock — Nova Pro (vision grading + routing explanation)
 
@@ -108,6 +108,7 @@ All Node.js ESM, one folder per function, least-privilege IAM per Lambda, CORS a
 | `purchases` | MyPurchasesFunction | `GET /purchases` | **JWT** |
 | `notifications` | NotificationsFunction | `GET /notifications` | **JWT** |
 | `feedback` | FeedbackFunction | `POST /feedback` | public (demo) |
+| `listing-withdraw` | ListingWithdrawFunction | `POST /listings/withdraw` | public demo (prod: JWT, seller identity from Cognito claims) |
 | `reservation-sweep` | ReservationSweepFunction | EventBridge `rate(15 min)` | n/a |
 
 See README §9 for the deliberate public-vs-JWT security model and the production hardening plan.
@@ -121,6 +122,8 @@ See README §9 for the deliberate public-vs-JWT security model and the productio
     Holds grading, routing, photos, and the purchase/reservation lifecycle fields.
   - `ProductsCatalog` — reference products for fair-price normalization (`productId` PK, `orderId` GSI).
   - `AmazeLoopNotifications` — in-app notifications (PK `userId`, SK `createdAt`).
+  - `UserProfiles` — lifetime **green-credit** total per user (PK `userId`); incremented best-effort
+    by `route-confirm` (seller) and `purchase` (buyer) as prototype reward tracking.
 - **Amazon S3** — `amazeloop-photos-<account>`; the browser uploads photos directly via presigned PUT
   URLs, so image bytes never pass through Lambda.
 - **Amazon Bedrock — Nova Pro** (`apac.amazon.nova-pro-v1:0`) — vision condition grading (temp 0.15)
@@ -173,7 +176,10 @@ marketplace automatically; `Recycle`/`Donate`/`ReturnToOrigin` are never listed.
 ## 7. Cross-cutting
 
 - **Auth/session:** identity comes from the Cognito JWT `sub` on protected routes (never the request
-  body); `Session` caches it in memory for the session.
+  body); `Session` caches it in memory for the session. **Role separation (buyer vs seller) is
+  enforced client-side** in the login flow today (marketplace admits `customer` accounts; sell doors
+  admit any seller account) — a UX guard, not a security boundary; production would gate it at the
+  API via the `custom:role` claim.
 - **Reservation lifecycle:** a 24h hold is freed two ways — lazy checks in `/listings` and
   `/purchases` keep reads correct immediately, and the scheduled sweep proactively releases expired
   holds and notifies the buyer + seller.

@@ -93,7 +93,9 @@ class EvaluationInput {
       chosenDisposition: json['chosenDisposition'] as String?,
       isOverride: json['isOverride'] as bool?,
       photoUrls: json['photoUrls'] != null
-          ? List<String>.from((json['photoUrls'] as List).map((e) => e.toString()))
+          ? List<String>.from(
+              (json['photoUrls'] as List).map((e) => e.toString()),
+            )
           : null,
       bestPhotoIndex: json['bestPhotoIndex'] as int?,
       resaleCount: (json['resaleCount'] as num?)?.toInt(),

@@ -4,6 +4,7 @@ import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:go_router/go_router.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/session.dart';
+import '../widgets/amazeloop_mascot.dart';
 
 /// Where the user came from. Used to decide what role to assign on signup
 /// (so they don't have to pick) and where to send them after a successful
@@ -20,6 +21,39 @@ enum LoginEntry {
   /// Reached from `Sell / Trade-in → Warehouse`; role is locked to
   /// `warehouse` and post-login lands at the warehouse dashboard.
   warehouseSell,
+}
+
+/// Whether an account with [role] (its Cognito `custom:role`) may sign in
+/// through [entry]. The system has two roles — `warehouse` (seller) and
+/// `customer` (buyer / individual trade-in).
+///
+/// Rule: the marketplace (buyer) door is restricted to `customer` accounts so
+/// a warehouse account can't buy. Both *sell* doors (Consumer Trade-in and
+/// Warehouse) accept any signed-in seller account — a customer can list an
+/// individual item and a warehouse account can list stock through either door.
+/// Pure + top-level so it can be unit-tested.
+bool roleAllowedForEntry(LoginEntry entry, String? role) {
+  switch (entry) {
+    case LoginEntry.buyer:
+      return role == 'customer';
+    case LoginEntry.customerSell:
+    case LoginEntry.warehouseSell:
+      return role == 'customer' || role == 'warehouse';
+  }
+}
+
+/// User-facing message shown when an account's role doesn't match [entry].
+String loginEntryMismatchMessage(LoginEntry entry) {
+  switch (entry) {
+    case LoginEntry.buyer:
+      return 'This is a warehouse seller account. The marketplace is for '
+          'buyers — sign in with a customer account, or use "Sell / Trade-in" '
+          'to list items.';
+    case LoginEntry.customerSell:
+    case LoginEntry.warehouseSell:
+      return 'We could not verify this account. Please sign up first, then '
+          'sign in to start selling.';
+  }
 }
 
 class LoginView extends StatefulWidget {
@@ -156,6 +190,22 @@ class _LoginViewState extends State<LoginView> {
       if (result.isSignedIn) {
         await _populateSession();
 
+        // Reject if this account's role doesn't match the login entry
+        // (seller account on the marketplace, or buyer on the seller side).
+        final roleError = await _checkRoleForEntry();
+        if (roleError != null) {
+          if (mounted) {
+            setState(() {
+              _message = roleError;
+              _isError = true;
+            });
+          }
+          return;
+        }
+
+        // Notify auth-dependent UI (buyer tabs) that we're now signed in.
+        Session.notifyChanged();
+
         // Load grading history for this user
         await _loadHistory(Session.userId!);
 
@@ -242,6 +292,24 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  /// Verifies the signed-in account's `custom:role` is allowed for the door
+  /// (entry) the user is logging in through. Returns null when allowed;
+  /// otherwise signs the user back out, clears the session, and returns a
+  /// user-facing error.
+  ///
+  /// Marketplace is restricted to `customer` accounts (a warehouse account
+  /// can't buy). Both sell doors accept any signed-in seller account. This is
+  /// a client-side UX guard.
+  Future<String?> _checkRoleForEntry() async {
+    if (roleAllowedForEntry(widget.entry, Session.role)) return null;
+    // Reject the login entirely — don't leave a usable session behind.
+    try {
+      await Amplify.Auth.signOut();
+    } catch (_) {}
+    Session.clear();
+    return loginEntryMismatchMessage(widget.entry);
+  }
+
   /// After a successful login, sends the user to the screen appropriate
   /// for their entry path and role, and clears the navigation stack so
   /// back-button can't drop them back into the login form.
@@ -254,11 +322,8 @@ class _LoginViewState extends State<LoginView> {
         context.go('/sell/intro');
         break;
       case LoginEntry.buyer:
-        if (Session.role == 'warehouse') {
-          context.go('/seller/grade');
-        } else {
-          context.go('/buyer/market');
-        }
+        // Role is guaranteed to be 'customer' here by _checkRoleForEntry.
+        context.go('/buyer/market');
         break;
     }
   }
@@ -300,16 +365,20 @@ class _LoginViewState extends State<LoginView> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline,
-                          size: 14, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           "Don't see it? Please check your spam or junk folder.",
                           style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic),
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ],
@@ -356,7 +425,9 @@ class _LoginViewState extends State<LoginView> {
                       });
                       if (dialogContext.mounted) {
                         ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(content: Text('A new code has been sent.')),
+                          const SnackBar(
+                            content: Text('A new code has been sent.'),
+                          ),
                         );
                       }
                     } on AuthException catch (e) {
@@ -395,6 +466,26 @@ class _LoginViewState extends State<LoginView> {
                           );
                           if (signInResult.isSignedIn) {
                             await _populateSession();
+
+                            // Enforce the same role-vs-entry gate as a
+                            // normal login after auto-verify sign-in.
+                            final roleError = await _checkRoleForEntry();
+                            if (roleError != null) {
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                              if (mounted) {
+                                setState(() {
+                                  _message = roleError;
+                                  _isError = true;
+                                });
+                              }
+                              return;
+                            }
+
+                            // Notify auth-dependent UI that we're signed in.
+                            Session.notifyChanged();
+
                             await _loadHistory(Session.userId!);
 
                             if (dialogContext.mounted) {
@@ -619,16 +710,20 @@ class _LoginViewState extends State<LoginView> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline,
-                          size: 14, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           "Don't see it? Please check your spam or junk folder.",
                           style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic),
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ],
@@ -759,7 +854,10 @@ class _LoginViewState extends State<LoginView> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 48,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -775,7 +873,7 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // ─── Mascot illustration ───
-                    _buildMascot(),
+                    const AmazeLoopMascot(),
                     const SizedBox(height: 24),
 
                     // ─── Logo text ───
@@ -787,8 +885,14 @@ class _LoginViewState extends State<LoginView> {
                           letterSpacing: -0.5,
                         ),
                         children: [
-                          TextSpan(text: 'Amaze', style: TextStyle(color: Color(0xFF232F3E))),
-                          TextSpan(text: 'Loop', style: TextStyle(color: Color(0xFFFF9900))),
+                          TextSpan(
+                            text: 'Amaze',
+                            style: TextStyle(color: Color(0xFF232F3E)),
+                          ),
+                          TextSpan(
+                            text: 'Loop',
+                            style: TextStyle(color: Color(0xFFFF9900)),
+                          ),
                         ],
                       ),
                     ),
@@ -850,12 +954,22 @@ class _LoginViewState extends State<LoginView> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.mail_outline, color: Colors.grey.shade500, size: 20),
+                        prefixIcon: Icon(
+                          Icons.mail_outline,
+                          color: Colors.grey.shade500,
+                          size: 20,
+                        ),
                         hintText: 'Enter your email',
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -866,7 +980,10 @@ class _LoginViewState extends State<LoginView> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFFF9900), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFFF9900),
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -889,20 +1006,33 @@ class _LoginViewState extends State<LoginView> {
                       controller: _passwordController,
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade500, size: 20),
+                        prefixIcon: Icon(
+                          Icons.lock_outline,
+                          color: Colors.grey.shade500,
+                          size: 20,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _showPassword ? Icons.visibility_off : Icons.visibility,
+                            _showPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: Colors.grey.shade500,
                             size: 20,
                           ),
-                          onPressed: () => setState(() => _showPassword = !_showPassword),
+                          onPressed: () =>
+                              setState(() => _showPassword = !_showPassword),
                         ),
                         hintText: 'Enter your password',
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -913,7 +1043,10 @@ class _LoginViewState extends State<LoginView> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFFF9900), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFFF9900),
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -925,16 +1058,22 @@ class _LoginViewState extends State<LoginView> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: _isError ? Colors.red.shade50 : Colors.green.shade50,
+                          color: _isError
+                              ? Colors.red.shade50
+                              : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: _isError ? Colors.red.shade200 : Colors.green.shade200,
+                            color: _isError
+                                ? Colors.red.shade200
+                                : Colors.green.shade200,
                           ),
                         ),
                         child: Text(
                           _message!,
                           style: TextStyle(
-                            color: _isError ? Colors.red.shade700 : Colors.green.shade700,
+                            color: _isError
+                                ? Colors.red.shade700
+                                : Colors.green.shade700,
                             fontSize: 13,
                           ),
                         ),
@@ -946,7 +1085,9 @@ class _LoginViewState extends State<LoginView> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: (_isSignUpLoading || _isLoginLoading) ? null : _login,
+                        onPressed: (_isSignUpLoading || _isLoginLoading)
+                            ? null
+                            : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF9900),
                           foregroundColor: Colors.white,
@@ -960,7 +1101,10 @@ class _LoginViewState extends State<LoginView> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Text(
                                 'LOG IN',
@@ -978,11 +1122,16 @@ class _LoginViewState extends State<LoginView> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: (_isSignUpLoading || _isLoginLoading) ? null : _signUp,
+                        onPressed: (_isSignUpLoading || _isLoginLoading)
+                            ? null
+                            : _signUp,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF111111),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                          side: BorderSide(
+                            color: Colors.grey.shade400,
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -991,7 +1140,9 @@ class _LoginViewState extends State<LoginView> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text(
                                 'SIGN UP',
@@ -1026,106 +1177,4 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Mascot — cardboard box with recycle arrows, sparkles, and leaves
-  // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildMascot() {
-    return SizedBox(
-      height: 100,
-      width: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Sparkles
-          Positioned(
-            top: 0,
-            left: 20,
-            child: Icon(Icons.auto_awesome, size: 14, color: const Color(0xFFFF9900).withValues(alpha: 0.7)),
-          ),
-          Positioned(
-            top: 8,
-            right: 15,
-            child: Icon(Icons.auto_awesome, size: 10, color: const Color(0xFFFF9900).withValues(alpha: 0.5)),
-          ),
-          // Recycle arrows
-          const Positioned(
-            top: 5,
-            child: Icon(Icons.sync, size: 28, color: Color(0xFF232F3E)),
-          ),
-          // Box
-          Positioned(
-            bottom: 0,
-            child: Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8C99B),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFD4A76A), width: 2),
-              ),
-              child: Stack(
-                children: [
-                  // Tape strip
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF4A6572),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
-                      ),
-                    ),
-                  ),
-                  // Eyes
-                  Positioned(
-                    top: 28,
-                    left: 18,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Color(0xFF333333), shape: BoxShape.circle),
-                    ),
-                  ),
-                  Positioned(
-                    top: 28,
-                    right: 18,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Color(0xFF333333), shape: BoxShape.circle),
-                    ),
-                  ),
-                  // Smile
-                  Positioned(
-                    bottom: 16,
-                    left: 22,
-                    right: 22,
-                    child: Container(
-                      height: 12,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: const Color(0xFF333333), width: 2),
-                          left: BorderSide(color: const Color(0xFF333333), width: 2),
-                          right: BorderSide(color: const Color(0xFF333333), width: 2),
-                        ),
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Leaf
-          Positioned(
-            bottom: 20,
-            right: 0,
-            child: Icon(Icons.eco, size: 24, color: Colors.green.shade400),
-          ),
-        ],
-      ),
-    );
-  }
 }

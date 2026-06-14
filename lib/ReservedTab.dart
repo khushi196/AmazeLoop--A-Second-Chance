@@ -34,13 +34,20 @@ class ReservedTabState extends State<ReservedTab> {
   void initState() {
     super.initState();
     _maybeLoad();
+    Session.authVersion.addListener(_onAuthChanged);
     _pollTimer = Timer.periodic(_pollInterval, (_) => _pollTick());
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    Session.authVersion.removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  /// Rebuild + reload when the user signs in or out.
+  void _onAuthChanged() {
+    if (mounted) setState(_maybeLoad);
   }
 
   void reload() {
@@ -49,13 +56,16 @@ class ReservedTabState extends State<ReservedTab> {
   }
 
   void _maybeLoad() {
-    final future =
-        Session.isSignedIn ? _repo.fetchPurchases(status: 'RESERVED') : null;
+    final future = Session.isSignedIn
+        ? _repo.fetchPurchases(status: 'RESERVED')
+        : null;
     _future = future;
     // Track which items are currently shown so the poll can detect changes.
-    future?.then((list) {
-      _shownIds = list.map((p) => p.evaluationId).toSet();
-    }).catchError((_) {});
+    future
+        ?.then((list) {
+          _shownIds = list.map((p) => p.evaluationId).toSet();
+        })
+        .catchError((_) {});
   }
 
   /// Background check — if the buyer's active reservations changed on the
@@ -168,7 +178,10 @@ class ReservedTabState extends State<ReservedTab> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: amazonOrange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -233,11 +246,16 @@ class ReservedTabState extends State<ReservedTab> {
                         ),
                         const SizedBox(width: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: amazonOrange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: amazonOrange.withValues(alpha: 0.4)),
+                            border: Border.all(
+                              color: amazonOrange.withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Text(
                             '${reserved.length} / 5 slots used',
@@ -386,11 +404,13 @@ class ReservedTabState extends State<ReservedTab> {
               Row(
                 children: [
                   OutlinedButton(
-                    onPressed: () =>
-                        context.push('/listing/${p.evaluationId}'),
+                    onPressed: () => context.push('/listing/${p.evaluationId}'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -410,8 +430,13 @@ class ReservedTabState extends State<ReservedTab> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: amazonOrange,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: amazonOrange.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      disabledBackgroundColor: amazonOrange.withValues(
+                        alpha: 0.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -446,19 +471,24 @@ class ReservedTabState extends State<ReservedTab> {
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.red.shade400),
+                          strokeWidth: 2,
+                          color: Colors.red.shade400,
+                        ),
                       )
                     : Icon(Icons.close, size: 16, color: Colors.red.shade400),
                 label: Text(
                   'Remove & relist',
                   style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red.shade600,
-                      fontWeight: FontWeight.w600),
+                    fontSize: 12,
+                    color: Colors.red.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
             ],
@@ -538,7 +568,9 @@ class ReservedTabState extends State<ReservedTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.green.shade700,
-          content: Text('"${p.title}" removed and relisted on the marketplace.'),
+          content: Text(
+            '"${p.title}" removed and relisted on the marketplace.',
+          ),
         ),
       );
     } catch (e) {
@@ -575,9 +607,13 @@ class ReservedTabState extends State<ReservedTab> {
   }
 
   Widget _timePill(DateTime? expiry, bool expired) {
-    final bg = expired ? Colors.red.shade50 : amazonOrange.withValues(alpha: 0.1);
+    final bg = expired
+        ? Colors.red.shade50
+        : amazonOrange.withValues(alpha: 0.1);
     final fg = expired ? Colors.red.shade700 : amazonOrange;
-    final borderColor = expired ? Colors.red.shade200 : amazonOrange.withValues(alpha: 0.4);
+    final borderColor = expired
+        ? Colors.red.shade200
+        : amazonOrange.withValues(alpha: 0.4);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -627,10 +663,7 @@ class ReservedTabState extends State<ReservedTab> {
               Text(
                 'Reserve an item from the marketplace to hold it for 24 hours.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
             ],
           ),
@@ -662,10 +695,7 @@ class ReservedTabState extends State<ReservedTab> {
               Text(
                 message.replaceFirst('Exception: ', ''),
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -675,7 +705,10 @@ class ReservedTabState extends State<ReservedTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: amazonOrange,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

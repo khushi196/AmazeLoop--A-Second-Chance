@@ -75,6 +75,40 @@ async function notify(userId, type, title, bodyText, evaluationId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Pure helpers (exported for unit tests; the handler reuses them so the rules
+// stay in one place).
+// ---------------------------------------------------------------------------
+
+/** True when [sellerId] owns [item] — only the lister may withdraw it. */
+export function isSellerOwner(item, sellerId) {
+  return Boolean(item) && Boolean(sellerId) && item.userId === sellerId;
+}
+
+/**
+ * True when [item] is a live marketplace listing the seller can still remove:
+ * routed for Resell, not already withdrawn, and not sold.
+ */
+export function isWithdrawableListing(item) {
+  if (!item) return false;
+  if (item.status !== "ROUTED") return false;
+  const effective = item.chosenDisposition || item.finalDisposition;
+  if (effective !== "Resell") return false;
+  if (item.marketplaceStatus === "withdrawn") return false;
+  if (item.purchaseStatus === "SOLD") return false;
+  return true;
+}
+
+/**
+ * True when [item] still has a reservation active at [now] (a Date). A hold
+ * with no expiry is treated as active; an expired hold is not.
+ */
+export function hasActiveReservation(item, now) {
+  if (!item || item.purchaseStatus !== "RESERVED" || !item.buyerUserId) return false;
+  if (!item.reservationExpiresAt) return true;
+  return new Date(item.reservationExpiresAt) > now;
+}
+
 export const handler = async (event) => {
   if (
     event?.requestContext?.http?.method === "OPTIONS" ||
@@ -121,7 +155,7 @@ export const handler = async (event) => {
   }
 
   // 2. Only the owning seller may withdraw their listing.
-  if (item.userId !== sellerId) {
+  if (!isSellerOwner(item, sellerId)) {
     return response(403, { error: "You can only remove your own listings." });
   }
 
@@ -145,10 +179,7 @@ export const handler = async (event) => {
   const now = new Date();
 
   // Was it actively reserved by a buyer (not an expired hold)?
-  const reservationActive =
-    item.purchaseStatus === "RESERVED" &&
-    item.buyerUserId &&
-    (!item.reservationExpiresAt || new Date(item.reservationExpiresAt) > now);
+  const reservationActive = hasActiveReservation(item, now);
   const reservedBuyerId = reservationActive ? item.buyerUserId : null;
 
   // 6. Withdraw: leave the marketplace and release any reservation. The

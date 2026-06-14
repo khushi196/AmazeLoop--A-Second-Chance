@@ -10,14 +10,19 @@ class GreenCreditBadge extends StatelessWidget {
   /// Compact = tighter padding/smaller text for dense table rows.
   final bool compact;
 
-  const GreenCreditBadge({super.key, required this.credits, this.compact = false});
+  const GreenCreditBadge({
+    super.key,
+    required this.credits,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (credits <= 0) return const SizedBox.shrink();
 
     const green = Color(0xFF1B7A3D);
-    final tooltip = 'You earned $credits green credits for keeping this item '
+    final tooltip =
+        'You earned $credits green credits for keeping this item '
         'in the loop instead of letting it go to waste.';
 
     return Tooltip(

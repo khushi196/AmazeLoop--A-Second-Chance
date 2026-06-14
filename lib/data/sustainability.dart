@@ -94,22 +94,26 @@ String buildSustainabilityImpact({
   if (sourceReason == 'Returned Amazon order') {
     String s1;
     if (reverseKm > 0 && transportCo2Kg > 0) {
-      s1 = 'By routing this Amazon return through AmazeLoop instead of '
+      s1 =
+          'By routing this Amazon return through AmazeLoop instead of '
           'sending it back to a distant hub, we avoid about $km km of '
           'reverse transport and roughly $transport kg of CO₂.';
     } else if (reverseKm > 0) {
-      s1 = 'By routing this Amazon return through AmazeLoop, we avoid about '
+      s1 =
+          'By routing this Amazon return through AmazeLoop, we avoid about '
           '$km km of reverse transport.';
     } else if (transportCo2Kg > 0) {
-      s1 = 'By routing this Amazon return through AmazeLoop, we save roughly '
+      s1 =
+          'By routing this Amazon return through AmazeLoop, we save roughly '
           '$transport kg of transport CO₂.';
     } else {
-      s1 = 'By routing this Amazon return through AmazeLoop, we give the '
+      s1 =
+          'By routing this Amazon return through AmazeLoop, we give the '
           'product another life.';
     }
     final s2 = reuseCo2Kg > 0
         ? 'That also keeps the product in use, avoiding around $reuse kg of '
-            'CO₂ compared with buying new. $owner'
+              'CO₂ compared with buying new. $owner'
         : owner;
     return '$s1 $s2';
   }
@@ -119,10 +123,10 @@ String buildSustainabilityImpact({
     // claim reverse-shipping / transport savings here — only the reuse impact.
     final s1 = reuseCo2Kg > 0
         ? 'Instead of sitting unused or being discarded, this item goes back '
-            'into circulation, avoiding roughly $reuse kg of CO₂ compared with '
-            'buying it new.'
+              'into circulation, avoiding roughly $reuse kg of CO₂ compared with '
+              'buying it new.'
         : 'Instead of sitting unused, this item goes back into circulation for '
-            'a second life.';
+              'a second life.';
     return '$s1 $owner';
   }
 

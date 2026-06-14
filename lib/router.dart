@@ -68,21 +68,38 @@ final GoRouter appRouter = GoRouter(
       builder: (c, s, navigationShell) =>
           BuyerDashboard(navigationShell: navigationShell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/buyer/market', builder: (c, s) => const MarketplaceTab()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/buyer/reserved', builder: (c, s) => const ReservedTab()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/buyer/purchases', builder: (c, s) => const PurchasesTab()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/buyer/notifications',
-            builder: (c, s) => const NotificationsTab(),
-          ),
-        ]),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/buyer/market',
+              builder: (c, s) => const MarketplaceTab(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/buyer/reserved',
+              builder: (c, s) => const ReservedTab(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/buyer/purchases',
+              builder: (c, s) => const PurchasesTab(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/buyer/notifications',
+              builder: (c, s) => const NotificationsTab(),
+            ),
+          ],
+        ),
       ],
     ),
 

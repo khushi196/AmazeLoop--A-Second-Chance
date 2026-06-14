@@ -21,6 +21,19 @@ class PurchasesTabState extends State<PurchasesTab> {
   void initState() {
     super.initState();
     _maybeLoad();
+    Session.authVersion.addListener(_onAuthChanged);
+  }
+
+  @override
+  void dispose() {
+    Session.authVersion.removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  /// Rebuild + reload when the user signs in or out, so this tab never stays
+  /// stuck on the "please sign in" gate after a successful login.
+  void _onAuthChanged() {
+    if (mounted) setState(_maybeLoad);
   }
 
   void reload() {
@@ -54,7 +67,18 @@ class PurchasesTabState extends State<PurchasesTab> {
     if (d == null) return '—';
     final local = d.toLocal();
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return 'Ordered ${months[local.month - 1]} ${local.day}, ${local.year}';
   }
@@ -135,7 +159,10 @@ class PurchasesTabState extends State<PurchasesTab> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: amazonOrange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -280,7 +307,11 @@ class PurchasesTabState extends State<PurchasesTab> {
                 // Order date
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade500),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       _formatDate(p.purchaseTimestamp),
@@ -316,7 +347,10 @@ class PurchasesTabState extends State<PurchasesTab> {
                 onPressed: () => _viewHealthCard(p),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: textPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   side: BorderSide(color: Colors.grey.shade300),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -324,10 +358,7 @@ class PurchasesTabState extends State<PurchasesTab> {
                 ),
                 child: const Text(
                   'View Health Card',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -338,10 +369,13 @@ class PurchasesTabState extends State<PurchasesTab> {
   }
 
   void _viewHealthCard(Purchase p) {
-    context.push('/listing/${p.evaluationId}', extra: {
-      'purchaseStatus': p.purchaseStatus,
-      'purchaseDate': p.purchaseTimestamp,
-    });
+    context.push(
+      '/listing/${p.evaluationId}',
+      extra: {
+        'purchaseStatus': p.purchaseStatus,
+        'purchaseDate': p.purchaseTimestamp,
+      },
+    );
   }
 
   Widget _thumb(String? url) {
@@ -432,7 +466,11 @@ class PurchasesTabState extends State<PurchasesTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey[400]),
+              Icon(
+                Icons.shopping_bag_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
               const SizedBox(height: 20),
               const Text(
                 'No purchases yet',
@@ -446,10 +484,7 @@ class PurchasesTabState extends State<PurchasesTab> {
               Text(
                 'Browse the marketplace and buy items you want.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
             ],
           ),
@@ -481,10 +516,7 @@ class PurchasesTabState extends State<PurchasesTab> {
               Text(
                 message.replaceFirst('Exception: ', ''),
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -494,7 +526,10 @@ class PurchasesTabState extends State<PurchasesTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: amazonOrange,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

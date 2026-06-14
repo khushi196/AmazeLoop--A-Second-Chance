@@ -30,6 +30,11 @@ function response(statusCode, body) {
 
 const VALID_TYPES = ["too_optimistic", "too_strict"];
 
+/** True if [t] is an accepted mis-grade feedback type. Exported for tests. */
+export function isValidFeedbackType(t) {
+  return VALID_TYPES.includes(t);
+}
+
 export const handler = async (event) => {
   if (event?.requestContext?.http?.method === "OPTIONS" ||
       event?.httpMethod === "OPTIONS") {
@@ -49,7 +54,7 @@ export const handler = async (event) => {
   if (!evaluationId || typeof evaluationId !== "string") {
     return response(400, { error: "evaluationId is required." });
   }
-  if (!VALID_TYPES.includes(feedbackType)) {
+  if (!isValidFeedbackType(feedbackType)) {
     return response(400, { error: "feedbackType must be 'too_optimistic' or 'too_strict'." });
   }
 
@@ -59,6 +64,9 @@ export const handler = async (event) => {
         TableName: EVALUATIONS_TABLE,
         Key: { evaluationId },
         UpdateExpression: "SET feedbackFlag = :f, feedbackType = :t",
+        // Only flag an evaluation that actually exists — without this, an
+        // UpdateItem would silently create a phantom record for a bad id.
+        ConditionExpression: "attribute_exists(evaluationId)",
         ExpressionAttributeValues: {
           ":f": true,
           ":t": feedbackType,
@@ -66,6 +74,9 @@ export const handler = async (event) => {
       })
     );
   } catch (e) {
+    if (e.name === "ConditionalCheckFailedException") {
+      return response(404, { error: "Evaluation not found." });
+    }
     return response(500, { error: "Failed to save feedback.", detail: e.message });
   }
 

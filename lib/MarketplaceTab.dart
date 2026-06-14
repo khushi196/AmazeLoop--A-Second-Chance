@@ -82,8 +82,10 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
     if (_loadingMore || !_hasMore) return;
     setState(() => _loadingMore = true);
     try {
-      final page =
-          await _repo.fetchListingsPage(limit: _pageSize, offset: _nextOffset);
+      final page = await _repo.fetchListingsPage(
+        limit: _pageSize,
+        offset: _nextOffset,
+      );
       if (!mounted) return;
       setState(() {
         _listings.addAll(page.listings);
@@ -98,7 +100,8 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
         SnackBar(
           backgroundColor: Colors.red.shade700,
           content: Text(
-              'Could not load more: ${e.toString().replaceFirst('Exception: ', '')}'),
+            'Could not load more: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
         ),
       );
     }
@@ -128,9 +131,11 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list
-          .where((l) =>
-              l.title.toLowerCase().contains(q) ||
-              (l.category?.toLowerCase().contains(q) ?? false))
+          .where(
+            (l) =>
+                l.title.toLowerCase().contains(q) ||
+                (l.category?.toLowerCase().contains(q) ?? false),
+          )
           .toList();
     }
     return list;
@@ -149,8 +154,8 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
             child: _loading
                 ? _buildShimmer()
                 : _error != null
-                    ? _buildError(_error!)
-                    : _buildList(),
+                ? _buildError(_error!)
+                : _buildList(),
           ),
         ],
       ),
@@ -217,26 +222,19 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                   const SizedBox(height: 2),
                   Text(
                     'Quality products. Second chance.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade500,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                   ),
                 ],
               ),
             ),
           ),
           if (listings.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildEmpty(),
-            )
+            SliverFillRemaining(hasScrollBody: false, child: _buildEmpty())
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               sliver: SliverGrid(
-                gridDelegate:
-                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 280,
                   childAspectRatio: 0.64,
                   crossAxisSpacing: 12,
@@ -267,7 +265,9 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2.5, color: amazonOrange),
+                    strokeWidth: 2.5,
+                    color: amazonOrange,
+                  ),
                 ),
               )
             : OutlinedButton.icon(
@@ -281,7 +281,9 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                   foregroundColor: textPrimary,
                   side: BorderSide(color: Colors.grey.shade400),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 14),
+                    horizontal: 32,
+                    vertical: 14,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -313,17 +315,24 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                 decoration: InputDecoration(
                   hintText: 'Search products or brands',
                   hintStyle: TextStyle(
-                      color: Colors.grey.shade400, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search,
-                      color: Colors.grey, size: 20),
+                    color: Colors.grey.shade400,
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear,
-                              size: 16, color: Colors.grey),
+                          icon: const Icon(
+                            Icons.clear,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -350,9 +359,10 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                   Text(
                     'Refresh',
                     style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -365,8 +375,11 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none,
-                    color: Colors.white70, size: 22),
+                icon: const Icon(
+                  Icons.notifications_none,
+                  color: Colors.white70,
+                  size: 22,
+                ),
                 onPressed: () => context.go('/buyer/notifications'),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -381,16 +394,16 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                     decoration: BoxDecoration(
                       color: amazonOrange,
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: amazonNavy, width: 1.5),
+                      border: Border.all(color: amazonNavy, width: 1.5),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       _unreadCount > 9 ? '9+' : '$_unreadCount',
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold),
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -407,14 +420,18 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                 child: Text(
                   _initials,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down,
-                  color: Colors.white70, size: 18),
+              const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.white70,
+                size: 18,
+              ),
             ],
           ),
         ],
@@ -451,8 +468,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.grey.shade700,
-            fontWeight:
-                isSelected ? FontWeight.bold : FontWeight.w500,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             fontSize: 13,
           ),
         ),
@@ -498,7 +514,9 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                   bottom: 10,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: amazonNavy.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(6),
@@ -506,8 +524,11 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Icon(Icons.verified_outlined,
-                            size: 12, color: Colors.white),
+                        Icon(
+                          Icons.verified_outlined,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                         SizedBox(width: 4),
                         Text(
                           'AI graded',
@@ -629,8 +650,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
       children: [
         Text(
           'Seller: ',
-          style:
-              TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
         ),
         Text(
           label,
@@ -673,10 +693,15 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: amazonOrange),
+                  strokeWidth: 2,
+                  color: amazonOrange,
+                ),
               )
-            : Icon(Icons.image_not_supported,
-                size: 32, color: Colors.grey.shade400),
+            : Icon(
+                Icons.image_not_supported,
+                size: 32,
+                color: Colors.grey.shade400,
+              ),
       ),
     );
   }
@@ -704,8 +729,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
         SliverPadding(
           padding: const EdgeInsets.all(12),
           sliver: SliverGrid(
-            gridDelegate:
-                const SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 280,
               childAspectRatio: 0.64,
               crossAxisSpacing: 12,
@@ -725,7 +749,8 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12)),
+                            top: Radius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -736,14 +761,23 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(height: 12, width: 120,
-                                color: Colors.grey.shade200),
+                            Container(
+                              height: 12,
+                              width: 120,
+                              color: Colors.grey.shade200,
+                            ),
                             const SizedBox(height: 8),
-                            Container(height: 16, width: 80,
-                                color: Colors.grey.shade200),
+                            Container(
+                              height: 16,
+                              width: 80,
+                              color: Colors.grey.shade200,
+                            ),
                             const SizedBox(height: 8),
-                            Container(height: 10, width: 100,
-                                color: Colors.grey.shade200),
+                            Container(
+                              height: 10,
+                              width: 100,
+                              color: Colors.grey.shade200,
+                            ),
                           ],
                         ),
                       ),
@@ -767,15 +801,19 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.storefront_outlined, size: 56,
-                color: Colors.grey.shade400),
+            Icon(
+              Icons.storefront_outlined,
+              size: 56,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             const Text(
               'No listings yet',
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -801,9 +839,10 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
             const Text(
               "Couldn't load the marketplace",
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(

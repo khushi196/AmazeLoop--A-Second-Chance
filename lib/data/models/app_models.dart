@@ -15,11 +15,11 @@ class ItemPayload {
 }
 
 class GradingResult {
-  final String condition; 
-  final String estimatedValue; 
-  final double confidenceScore; 
-  final String routeAction; 
-  final String routeReasoning; 
+  final String condition;
+  final String estimatedValue;
+  final double confidenceScore;
+  final String routeAction;
+  final String routeReasoning;
   final String healthCardId;
 
   GradingResult({

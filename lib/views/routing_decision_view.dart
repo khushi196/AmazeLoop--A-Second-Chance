@@ -161,13 +161,13 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
               ),
             )
           : _error != null
-              ? Center(
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: Colors.red.shade700),
-                  ),
-                )
-              : _buildContent(),
+          ? Center(
+              child: Text(
+                _error!,
+                style: TextStyle(color: Colors.red.shade700),
+              ),
+            )
+          : _buildContent(),
     );
   }
 
@@ -198,7 +198,10 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
               children: [
                 // ─── AI Recommendation pill ───
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF00687A).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(24),
@@ -209,7 +212,11 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.auto_awesome, size: 16, color: Color(0xFF00687A)),
+                      const Icon(
+                        Icons.auto_awesome,
+                        size: 16,
+                        color: Color(0xFF00687A),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'AI RECOMMENDATION:  ${r.finalDisposition.toUpperCase()}',
@@ -255,7 +262,11 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.location_on_outlined, size: 18, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Nearest warehouse: ${r.nearestWarehouseId} (${r.distanceKm ?? '—'} km away)',
@@ -290,7 +301,9 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                               ? amazonOrange.withValues(alpha: 0.05)
                               : Colors.white,
                           border: Border.all(
-                            color: isSelected ? amazonOrange : Colors.grey.shade300,
+                            color: isSelected
+                                ? amazonOrange
+                                : Colors.grey.shade300,
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -341,12 +354,19 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                             // AI PICK badge
                             if (isRecommended) ...[
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF00687A).withValues(alpha: 0.1),
+                                  color: const Color(
+                                    0xFF00687A,
+                                  ).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: const Color(0xFF00687A).withValues(alpha: 0.3),
+                                    color: const Color(
+                                      0xFF00687A,
+                                    ).withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: const Text(
@@ -369,7 +389,9 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: isSelected ? amazonOrange : Colors.grey.shade400,
+                                  color: isSelected
+                                      ? amazonOrange
+                                      : Colors.grey.shade400,
                                   width: 2,
                                 ),
                               ),
@@ -399,11 +421,18 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                     padding: const EdgeInsets.only(top: 4, bottom: 16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Warehouse return items may include Return to Origin when eligible.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ),
@@ -413,12 +442,19 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                     padding: const EdgeInsets.only(top: 4, bottom: 16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Warehouse return items may include Return to Origin when eligible.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
                           ),
                         ),
                       ],
@@ -438,17 +474,23 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                       color: _overrideMode ? Colors.grey.shade400 : textPrimary,
                     ),
                     label: Text(
-                      _overrideMode ? 'Override mode active' : 'Override recommendation',
+                      _overrideMode
+                          ? 'Override mode active'
+                          : 'Override recommendation',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _overrideMode ? Colors.grey.shade400 : textPrimary,
+                        color: _overrideMode
+                            ? Colors.grey.shade400
+                            : textPrimary,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       side: BorderSide(
-                        color: _overrideMode ? Colors.grey.shade300 : Colors.grey.shade400,
+                        color: _overrideMode
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade400,
                         width: 1.5,
                       ),
                       shape: RoundedRectangleBorder(
@@ -467,7 +509,9 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: amazonOrange,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: amazonOrange.withValues(alpha: 0.6),
+                      disabledBackgroundColor: amazonOrange.withValues(
+                        alpha: 0.6,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       elevation: 0,
                       shape: RoundedRectangleBorder(

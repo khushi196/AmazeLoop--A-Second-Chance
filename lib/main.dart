@@ -79,13 +79,23 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
         theme: theme,
         home: Scaffold(
           body: Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(_amplifyError!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _configureAmplify, child: const Text('Retry')),
-            ]),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  _amplifyError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _configureAmplify,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -96,7 +106,9 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
         debugShowCheckedModeBanner: false,
         theme: theme,
         home: const Scaffold(
-          body: Center(child: CircularProgressIndicator(color: Color(0xFFFF9900))),
+          body: Center(
+            child: CircularProgressIndicator(color: Color(0xFFFF9900)),
+          ),
         ),
       );
     }

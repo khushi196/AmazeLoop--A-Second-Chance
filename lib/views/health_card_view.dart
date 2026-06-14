@@ -8,15 +8,12 @@ import '../data/sustainability.dart' as sustain;
 
 class HealthCardView extends StatelessWidget {
   final EvaluationInput? evaluation;
+
   /// When true, the card is being viewed for an already-routed item (e.g. from
   /// the History tab), so the primary action is "Back to History" rather than
   /// the end-of-pipeline "Confirm & Route".
   final bool readOnly;
-  const HealthCardView({
-    super.key,
-    this.evaluation,
-    this.readOnly = false,
-  });
+  const HealthCardView({super.key, this.evaluation, this.readOnly = false});
 
   String? _heroPhotoUrl(EvaluationInput? e) {
     if (e == null || e.photoUrls == null || e.photoUrls!.isEmpty) return null;
@@ -158,7 +155,9 @@ class HealthCardView extends StatelessWidget {
                         height: 6,
                         decoration: const BoxDecoration(
                           color: amazonOrange,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
                         ),
                       ),
                       Padding(
@@ -178,13 +177,19 @@ class HealthCardView extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(12),
                                     image: _heroPhotoUrl(e) != null
                                         ? DecorationImage(
-                                            image: NetworkImage(_heroPhotoUrl(e)!),
+                                            image: NetworkImage(
+                                              _heroPhotoUrl(e)!,
+                                            ),
                                             fit: BoxFit.cover,
                                           )
                                         : null,
                                   ),
                                   child: _heroPhotoUrl(e) == null
-                                      ? Icon(Icons.image, size: 48, color: Colors.grey.shade400)
+                                      ? Icon(
+                                          Icons.image,
+                                          size: 48,
+                                          color: Colors.grey.shade400,
+                                        )
                                       : null,
                                 ),
                                 const SizedBox(width: 24),
@@ -192,14 +197,20 @@ class HealthCardView extends StatelessWidget {
                                 // Product details
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Condition badge
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: conditionColor,
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
                                           (e?.condition ?? 'N/A').toUpperCase(),
@@ -255,7 +266,9 @@ class HealthCardView extends StatelessWidget {
                               decoration: BoxDecoration(
                                 border: Border(
                                   top: BorderSide(color: Colors.grey.shade200),
-                                  bottom: BorderSide(color: Colors.grey.shade200),
+                                  bottom: BorderSide(
+                                    color: Colors.grey.shade200,
+                                  ),
                                 ),
                               ),
                               child: Row(
@@ -265,23 +278,36 @@ class HealthCardView extends StatelessWidget {
                                       icon: Icons.verified_outlined,
                                       iconColor: conditionColor,
                                       label: 'Condition',
-                                      value: (e?.condition ?? '—').toUpperCase(),
+                                      value: (e?.condition ?? '—')
+                                          .toUpperCase(),
                                       valueColor: conditionColor,
                                       sublabel: 'AI-graded',
                                     ),
                                   ),
-                                  Container(width: 1, height: 60, color: Colors.grey.shade200),
+                                  Container(
+                                    width: 1,
+                                    height: 60,
+                                    color: Colors.grey.shade200,
+                                  ),
                                   Expanded(
                                     child: _buildMetricItem(
                                       icon: Icons.sell_outlined,
                                       iconColor: amazonOrange,
                                       label: 'Est. resale value',
-                                      value: _money(e?.estimatedResaleValue ?? e?.normalizedPrice, currency),
+                                      value: _money(
+                                        e?.estimatedResaleValue ??
+                                            e?.normalizedPrice,
+                                        currency,
+                                      ),
                                       valueColor: amazonOrange,
                                       sublabel: 'Normalized value',
                                     ),
                                   ),
-                                  Container(width: 1, height: 60, color: Colors.grey.shade200),
+                                  Container(
+                                    width: 1,
+                                    height: 60,
+                                    color: Colors.grey.shade200,
+                                  ),
                                   Expanded(
                                     child: _buildMetricItem(
                                       icon: Icons.local_shipping_outlined,
@@ -312,7 +338,9 @@ class HealthCardView extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: amazonNavy.withValues(alpha: 0.1),
+                                        color: amazonNavy.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Icon(
@@ -324,7 +352,8 @@ class HealthCardView extends StatelessWidget {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Text(
                                             'Condition reason:',
@@ -417,11 +446,18 @@ class HealthCardView extends StatelessWidget {
                                     if (isOverride) ...[
                                       const SizedBox(width: 10),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.amber.shade50,
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(color: Colors.amber.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.amber.shade300,
+                                          ),
                                         ),
                                         child: Text(
                                           'OVERRIDDEN',
@@ -474,9 +510,14 @@ class HealthCardView extends StatelessWidget {
                                     width: 26,
                                     height: 26,
                                     decoration: BoxDecoration(
-                                      color: amazonOrange.withValues(alpha: 0.1),
+                                      color: amazonOrange.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: amazonOrange, width: 1.5),
+                                      border: Border.all(
+                                        color: amazonOrange,
+                                        width: 1.5,
+                                      ),
                                     ),
                                     child: Center(
                                       child: Text(
@@ -489,11 +530,14 @@ class HealthCardView extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  if (entry.key < _nextSteps(disposition).length - 1)
+                                  if (entry.key <
+                                      _nextSteps(disposition).length - 1)
                                     Container(
                                       width: 2,
                                       height: 16,
-                                      color: amazonOrange.withValues(alpha: 0.3),
+                                      color: amazonOrange.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -537,7 +581,11 @@ class HealthCardView extends StatelessWidget {
                                 } catch (err) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Could not generate report: $err')),
+                                      SnackBar(
+                                        content: Text(
+                                          'Could not generate report: $err',
+                                        ),
+                                      ),
                                     );
                                   }
                                 }
@@ -554,7 +602,10 @@ class HealthCardView extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           foregroundColor: textPrimary,
-                          side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                          side: BorderSide(
+                            color: Colors.grey.shade400,
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -596,7 +647,11 @@ class HealthCardView extends StatelessWidget {
                     onPressed: e == null
                         ? null
                         : () => _showFeedbackDialog(context, e.evaluationId!),
-                    icon: Icon(Icons.flag_outlined, size: 16, color: Colors.grey.shade600),
+                    icon: Icon(
+                      Icons.flag_outlined,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
                     label: Text(
                       'Mark as mis-graded',
                       style: TextStyle(
@@ -606,7 +661,10 @@ class HealthCardView extends StatelessWidget {
                       ),
                     ),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                     ),
                   ),
                 ),
@@ -666,8 +724,11 @@ class HealthCardView extends StatelessWidget {
                   color: Colors.green.shade50,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.eco_outlined,
-                    color: Colors.green.shade700, size: 22),
+                child: Icon(
+                  Icons.eco_outlined,
+                  color: Colors.green.shade700,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -737,7 +798,11 @@ class HealthCardView extends StatelessWidget {
   }
 
   Widget _sustainRow(
-      IconData icon, String label, String value, String sublabel) {
+    IconData icon,
+    String label,
+    String value,
+    String sublabel,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -793,10 +858,7 @@ class HealthCardView extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -812,10 +874,7 @@ class HealthCardView extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           sublabel,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
         ),
       ],
     );
@@ -826,7 +885,9 @@ class HealthCardView extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           title: const Text(
             'Report mis-grading',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -861,7 +922,10 @@ class HealthCardView extends StatelessWidget {
   }
 
   Future<void> _submitFeedback(
-      BuildContext context, String evaluationId, String feedbackType) async {
+    BuildContext context,
+    String evaluationId,
+    String feedbackType,
+  ) async {
     try {
       await GradeRepository().submitFeedback(
         evaluationId: evaluationId,

@@ -25,23 +25,25 @@ void main() {
       expect(_wordCount(text) <= 60, isTrue);
     });
 
-    test('Returned Amazon order — only reverse km (no transport), reuse > 0',
-        () {
-      final text = buildSustainabilityImpact(
-        sourceReason: 'Returned Amazon order',
-        disposition: 'Refurbish',
-        reverseKm: 47,
-        transportCo2Kg: 0,
-        reuseCo2Kg: 20,
-        ownersTotal: 2,
-      );
-      // ignore: avoid_print
-      print('B) $text');
-      expect(text, contains('about 47 km')); // < 50 -> nearest 1
-      expect(text, isNot(contains('transport CO₂')));
-      expect(text, contains('around 20.0 kg'));
-      expect(text, contains('owner 2'));
-    });
+    test(
+      'Returned Amazon order — only reverse km (no transport), reuse > 0',
+      () {
+        final text = buildSustainabilityImpact(
+          sourceReason: 'Returned Amazon order',
+          disposition: 'Refurbish',
+          reverseKm: 47,
+          transportCo2Kg: 0,
+          reuseCo2Kg: 20,
+          ownersTotal: 2,
+        );
+        // ignore: avoid_print
+        print('B) $text');
+        expect(text, contains('about 47 km')); // < 50 -> nearest 1
+        expect(text, isNot(contains('transport CO₂')));
+        expect(text, contains('around 20.0 kg'));
+        expect(text, contains('owner 2'));
+      },
+    );
 
     test('Returned Amazon order — only transport, no reuse', () {
       final text = buildSustainabilityImpact(
@@ -76,24 +78,26 @@ void main() {
       expect(text, contains('owner 2'));
     });
 
-    test('Unused at home — never mentions transport, even when significant',
-        () {
-      final text = buildSustainabilityImpact(
-        sourceReason: 'Unused at home',
-        disposition: 'Resell',
-        reverseKm: 120,
-        transportCo2Kg: 4.5,
-        reuseCo2Kg: 8,
-        ownersTotal: 4,
-      );
-      // ignore: avoid_print
-      print('E) $text');
-      expect(text, contains('back into circulation'));
-      expect(text, contains('roughly 8.0 kg'));
-      expect(text, isNot(contains('transport')));
-      expect(text, isNot(contains('km')));
-      expect(text, contains('owner 4'));
-    });
+    test(
+      'Unused at home — never mentions transport, even when significant',
+      () {
+        final text = buildSustainabilityImpact(
+          sourceReason: 'Unused at home',
+          disposition: 'Resell',
+          reverseKm: 120,
+          transportCo2Kg: 4.5,
+          reuseCo2Kg: 8,
+          ownersTotal: 4,
+        );
+        // ignore: avoid_print
+        print('E) $text');
+        expect(text, contains('back into circulation'));
+        expect(text, contains('roughly 8.0 kg'));
+        expect(text, isNot(contains('transport')));
+        expect(text, isNot(contains('km')));
+        expect(text, contains('owner 4'));
+      },
+    );
 
     test('Edge case — nothing saved (both zero) -> fallback', () {
       final text = buildSustainabilityImpact(
@@ -138,7 +142,8 @@ void main() {
       );
       // ignore: avoid_print
       print('H) $text');
-      final hedged = text.contains('about') ||
+      final hedged =
+          text.contains('about') ||
           text.contains('roughly') ||
           text.contains('around');
       expect(hedged, isTrue);

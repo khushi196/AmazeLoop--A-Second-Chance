@@ -79,7 +79,9 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           try {
             final decoded = img.decodeImage(rawBytes);
             if (decoded != null) {
-              uploadBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 90));
+              uploadBytes = Uint8List.fromList(
+                img.encodeJpg(decoded, quality: 90),
+              );
             } else {
               uploadBytes = rawBytes;
             }
@@ -182,7 +184,9 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: amazonOrange,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: amazonOrange.withValues(alpha: 0.6),
+                        disabledBackgroundColor: amazonOrange.withValues(
+                          alpha: 0.6,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -243,7 +247,11 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                   color: amazonNavy.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.inventory_2_outlined, color: amazonNavy, size: 22),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  color: amazonNavy,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -303,10 +311,7 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                   label: 'Reason for Return',
                   value: _selectedReason,
                   hint: 'Select reason',
-                  items: const [
-                    'Returned Amazon order',
-                    'Unused at home',
-                  ],
+                  items: const ['Returned Amazon order', 'Unused at home'],
                   onChanged: (val) => setState(() => _selectedReason = val),
                 ),
               ),
@@ -362,7 +367,11 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                       color: amazonOrange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.camera_alt_outlined, color: amazonOrange, size: 22),
+                    child: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: amazonOrange,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Text(
@@ -376,11 +385,16 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: amazonOrange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: amazonOrange.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: amazonOrange.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: const Text(
                   'Required',
@@ -424,9 +438,13 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          _selectedImages.isNotEmpty ? Icons.check_circle : Icons.cloud_upload_outlined,
+                          _selectedImages.isNotEmpty
+                              ? Icons.check_circle
+                              : Icons.cloud_upload_outlined,
                           size: 32,
-                          color: _selectedImages.isNotEmpty ? amazonOrange : amazonOrange,
+                          color: _selectedImages.isNotEmpty
+                              ? amazonOrange
+                              : amazonOrange,
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -436,12 +454,16 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _selectedImages.isNotEmpty ? amazonOrange : textPrimary,
+                            color: _selectedImages.isNotEmpty
+                                ? amazonOrange
+                                : textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _selectedImages.isNotEmpty ? 'Click to add more' : 'Supports JPG, PNG',
+                          _selectedImages.isNotEmpty
+                              ? 'Click to add more'
+                              : 'Supports JPG, PNG',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade500,
@@ -499,7 +521,10 @@ class _SubmitItemViewState extends State<SubmitItemView> {
             hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -545,7 +570,10 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -559,8 +587,13 @@ class _SubmitItemViewState extends State<SubmitItemView> {
               borderSide: const BorderSide(color: amazonNavy, width: 1.5),
             ),
           ),
-          hint: Text(hint, style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
-          items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+          hint: Text(
+            hint,
+            style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+          ),
+          items: items
+              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+              .toList(),
           onChanged: onChanged,
         ),
       ],

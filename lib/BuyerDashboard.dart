@@ -22,6 +22,15 @@ class BuyerDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild the shell (e.g. sidebar Logout vs Switch Role) when the user
+    // signs in or out.
+    return ValueListenableBuilder<int>(
+      valueListenable: Session.authVersion,
+      builder: (context, _, __) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: surfaceBg,
       body: Row(
@@ -56,10 +65,26 @@ class BuyerDashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                _buildNavItem(icon: Icons.storefront, title: 'Marketplace', index: 0),
-                _buildNavItem(icon: Icons.bookmark_outline, title: 'Reserved', index: 1),
-                _buildNavItem(icon: Icons.shopping_bag_outlined, title: 'My Purchases', index: 2),
-                _buildNavItem(icon: Icons.notifications_none, title: 'Notifications', index: 3),
+                _buildNavItem(
+                  icon: Icons.storefront,
+                  title: 'Marketplace',
+                  index: 0,
+                ),
+                _buildNavItem(
+                  icon: Icons.bookmark_outline,
+                  title: 'Reserved',
+                  index: 1,
+                ),
+                _buildNavItem(
+                  icon: Icons.shopping_bag_outlined,
+                  title: 'My Purchases',
+                  index: 2,
+                ),
+                _buildNavItem(
+                  icon: Icons.notifications_none,
+                  title: 'Notifications',
+                  index: 3,
+                ),
 
                 const Spacer(),
 
@@ -74,12 +99,18 @@ class BuyerDashboard extends StatelessWidget {
                       context.go('/');
                     },
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 24,
+                      ),
                       child: Row(
                         children: [
                           Icon(Icons.logout, color: Colors.grey),
                           SizedBox(width: 16),
-                          Text('Logout', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                          Text(
+                            'Logout',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
                         ],
                       ),
                     ),
@@ -88,12 +119,18 @@ class BuyerDashboard extends StatelessWidget {
                   InkWell(
                     onTap: () => context.go('/'),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 24,
+                      ),
                       child: Row(
                         children: [
                           Icon(Icons.arrow_back, color: Colors.grey),
                           SizedBox(width: 16),
-                          Text('Switch Role', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                          Text(
+                            'Switch Role',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
                         ],
                       ),
                     ),

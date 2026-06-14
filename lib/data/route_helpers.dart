@@ -70,7 +70,8 @@ Map<String, dynamic> deriveRouteEligibility({
 }) {
   // "Returned Amazon order" is the customer-return source; everything else is
   // a consumer trade-in or unknown.
-  final sourceType = (reason == 'Returned Amazon order' ||
+  final sourceType =
+      (reason == 'Returned Amazon order' ||
           sortingQueue == 'LOGISTICS_OPTIMIZATION_QUEUE')
       ? 'customer_return'
       : 'consumer_trade_in';
@@ -82,7 +83,8 @@ Map<String, dynamic> deriveRouteEligibility({
 
   // Donation fits a still-usable item (Used/Good) whose resale value is too
   // low to be worth listing on the marketplace.
-  final donateEligible = (condition == 'Used' || condition == 'Good') &&
+  final donateEligible =
+      (condition == 'Used' || condition == 'Good') &&
       (estimatedResaleValue ?? 0) <= kDonateResaleCeilingInr;
 
   return {

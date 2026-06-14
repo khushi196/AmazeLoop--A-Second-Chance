@@ -29,13 +29,20 @@ class NotificationsTabState extends State<NotificationsTab> {
   void initState() {
     super.initState();
     _maybeLoad();
+    Session.authVersion.addListener(_onAuthChanged);
     _pollTimer = Timer.periodic(_pollInterval, (_) => _pollTick());
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    Session.authVersion.removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  /// Rebuild + reload when the user signs in or out.
+  void _onAuthChanged() {
+    if (mounted) setState(_maybeLoad);
   }
 
   void reload() {
@@ -46,16 +53,19 @@ class NotificationsTabState extends State<NotificationsTab> {
   void _maybeLoad() {
     final future = Session.isSignedIn ? _repo.fetchNotifications() : null;
     _future = future;
-    future?.then((res) {
-      _shownSignature = _signatureOf(res);
-    }).catchError((_) {});
+    future
+        ?.then((res) {
+          _shownSignature = _signatureOf(res);
+        })
+        .catchError((_) {});
   }
 
   /// A cheap fingerprint of the notification feed (count + newest id) so the
   /// poll can tell when something changed without deep-comparing every item.
   String _signatureOf(NotificationsResult res) {
-    final first =
-        res.notifications.isNotEmpty ? res.notifications.first.notificationId : '';
+    final first = res.notifications.isNotEmpty
+        ? res.notifications.first.notificationId
+        : '';
     return '${res.notifications.length}:$first';
   }
 
@@ -168,7 +178,11 @@ class NotificationsTabState extends State<NotificationsTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.notifications_off_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 20),
             const Text(
               'Sign in to see notifications',
@@ -191,7 +205,10 @@ class NotificationsTabState extends State<NotificationsTab> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: amazonOrange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -225,7 +242,8 @@ class NotificationsTabState extends State<NotificationsTab> {
           if (snapshot.hasError) {
             return _buildError(snapshot.error.toString());
           }
-          final notes = snapshot.data?.notifications ?? const <AppNotification>[];
+          final notes =
+              snapshot.data?.notifications ?? const <AppNotification>[];
           if (notes.isEmpty) {
             return _buildEmpty();
           }
@@ -275,9 +293,7 @@ class NotificationsTabState extends State<NotificationsTab> {
       decoration: BoxDecoration(
         border: isLast
             ? null
-            : Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
-              ),
+            : Border(bottom: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,15 +302,8 @@ class NotificationsTabState extends State<NotificationsTab> {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              color: bgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _iconFor(n.type),
-              color: Colors.white,
-              size: 22,
-            ),
+            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+            child: Icon(_iconFor(n.type), color: Colors.white, size: 22),
           ),
           const SizedBox(width: 16),
 
@@ -328,10 +337,7 @@ class NotificationsTabState extends State<NotificationsTab> {
           // Time ago
           Text(
             _ago(n.createdAt),
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
         ],
       ),
@@ -403,7 +409,10 @@ class NotificationsTabState extends State<NotificationsTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: amazonOrange,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

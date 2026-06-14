@@ -16,7 +16,10 @@ class SellIntroScreen extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 48,
+                  vertical: 48,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -40,8 +43,14 @@ class SellIntroScreen extends StatelessWidget {
                           letterSpacing: -0.5,
                         ),
                         children: [
-                          TextSpan(text: 'Amaze', style: TextStyle(color: amazonNavy)),
-                          TextSpan(text: 'Loop', style: TextStyle(color: amazonOrange)),
+                          TextSpan(
+                            text: 'Amaze',
+                            style: TextStyle(color: amazonNavy),
+                          ),
+                          TextSpan(
+                            text: 'Loop',
+                            style: TextStyle(color: amazonOrange),
+                          ),
                         ],
                       ),
                     ),
@@ -80,10 +89,7 @@ class SellIntroScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 24),
                         // Right: Illustration
-                        Expanded(
-                          flex: 2,
-                          child: _buildIllustration(),
-                        ),
+                        Expanded(flex: 2, child: _buildIllustration()),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -111,12 +117,17 @@ class SellIntroScreen extends StatelessWidget {
                             badgeColor: amazonOrange,
                             badgeIcon: Icons.add,
                             title: 'Upload photos',
-                            subtitle: 'Take clear photos of your device from all sides.',
+                            subtitle:
+                                'Take clear photos of your device from all sides.',
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(top: 50),
-                          child: Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+                          child: Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey.shade400,
+                            size: 24,
+                          ),
                         ),
                         Expanded(
                           child: _buildStepCard(
@@ -126,12 +137,17 @@ class SellIntroScreen extends StatelessWidget {
                             badgeColor: const Color(0xFF00687A),
                             badgeIcon: Icons.check,
                             title: 'AI grades condition',
-                            subtitle: 'Our AI analyzes the condition and checks key factors.',
+                            subtitle:
+                                'Our AI analyzes the condition and checks key factors.',
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(top: 50),
-                          child: Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+                          child: Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey.shade400,
+                            size: 24,
+                          ),
                         ),
                         Expanded(
                           child: _buildStepCard(
@@ -141,7 +157,8 @@ class SellIntroScreen extends StatelessWidget {
                             badgeColor: amazonOrange,
                             badgeIcon: Icons.check,
                             title: 'Get route and value',
-                            subtitle: 'Choose to Resell, Refurbish, or Recycle—get your value.',
+                            subtitle:
+                                'Choose to Resell, Refurbish, or Recycle—get your value.',
                           ),
                         ),
                       ],
@@ -181,7 +198,10 @@ class SellIntroScreen extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                          side: BorderSide(
+                            color: Colors.grey.shade400,
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -218,12 +238,20 @@ class SellIntroScreen extends StatelessWidget {
           Positioned(
             top: 0,
             left: 10,
-            child: Icon(Icons.auto_awesome, size: 12, color: amazonOrange.withValues(alpha: 0.6)),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 12,
+              color: amazonOrange.withValues(alpha: 0.6),
+            ),
           ),
           Positioned(
             top: 10,
             right: 20,
-            child: Icon(Icons.auto_awesome, size: 8, color: amazonOrange.withValues(alpha: 0.4)),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 8,
+              color: amazonOrange.withValues(alpha: 0.4),
+            ),
           ),
           // Recycle arrow
           Positioned(
@@ -321,11 +349,22 @@ class SellIntroScreen extends StatelessWidget {
                       height: 10,
                       decoration: BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: const Color(0xFF333333), width: 2),
-                          left: BorderSide(color: const Color(0xFF333333), width: 2),
-                          right: BorderSide(color: const Color(0xFF333333), width: 2),
+                          bottom: BorderSide(
+                            color: const Color(0xFF333333),
+                            width: 2,
+                          ),
+                          left: BorderSide(
+                            color: const Color(0xFF333333),
+                            width: 2,
+                          ),
+                          right: BorderSide(
+                            color: const Color(0xFF333333),
+                            width: 2,
+                          ),
                         ),
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -397,7 +436,10 @@ class SellIntroScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: iconBgColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
-                  border: Border.all(color: iconBgColor.withValues(alpha: 0.3), width: 2),
+                  border: Border.all(
+                    color: iconBgColor.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
                 ),
                 child: Icon(icon, size: 26, color: iconBgColor),
               ),
