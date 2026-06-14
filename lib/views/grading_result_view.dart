@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/report_generator.dart';
-import 'routing_decision_view.dart';
 
 class GradingResultView extends StatelessWidget {
-  final Function(Widget)? onNavigate;
-  final Function()? onFinishToHistory;
   final EvaluationInput? evaluation;
   const GradingResultView({
     super.key,
-    this.onNavigate,
     this.evaluation,
-    this.onFinishToHistory,
   });
 
   String _formatPrice(num? value, String currency) {
@@ -247,14 +243,8 @@ class GradingResultView extends StatelessWidget {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            if (onNavigate != null && e != null) {
-                              onNavigate!(
-                                RoutingDecisionView(
-                                  onNavigate: onNavigate,
-                                  evaluation: e,
-                                  onFinishToHistory: onFinishToHistory,
-                                ),
-                              );
+                            if (e != null) {
+                              context.push('/seller/grade/route', extra: e);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

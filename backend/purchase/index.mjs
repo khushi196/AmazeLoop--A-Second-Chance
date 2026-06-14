@@ -24,6 +24,7 @@ import {
   GetCommand,
   UpdateCommand,
   PutCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 
@@ -31,6 +32,7 @@ const REGION = process.env.AWS_REGION || "ap-south-1";
 const EVALUATIONS_TABLE = process.env.EVALUATIONS_TABLE || "Evaluations";
 const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE || "AmazeLoopNotifications";
 const RESERVATION_HOURS = Number(process.env.RESERVATION_HOURS || 24);
+const MAX_ACTIVE_RESERVATIONS = 5;
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 
@@ -306,6 +308,33 @@ export const handler = async (event) => {
   const expiresAt = new Date(
     now.getTime() + RESERVATION_HOURS * 60 * 60 * 1000
   ).toISOString();
+
+  // Enforce max active reservations per buyer (prototype: Scan-based count).
+  try {
+    const countResult = await ddb.send(
+      new ScanCommand({
+        TableName: EVALUATIONS_TABLE,
+        FilterExpression:
+          "buyerUserId = :b AND purchaseStatus = :r AND reservationExpiresAt >= :now",
+        ExpressionAttributeValues: {
+          ":b": buyerUserId,
+          ":r": "RESERVED",
+          ":now": nowIso,
+        },
+        Select: "COUNT",
+      })
+    );
+    if ((countResult.Count || 0) >= MAX_ACTIVE_RESERVATIONS) {
+      return response(409, {
+        error: `You can have at most ${MAX_ACTIVE_RESERVATIONS} active reservations. Please buy or remove one first.`,
+        activeReservations: countResult.Count,
+        maxReservations: MAX_ACTIVE_RESERVATIONS,
+      });
+    }
+  } catch (e) {
+    // Non-fatal — allow the reservation if the count check fails (graceful degradation).
+    console.error(`Reservation count check failed: ${e.message}`);
+  }
 
   try {
     await ddb.send(

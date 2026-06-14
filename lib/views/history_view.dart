@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../constants.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/route_helpers.dart';
 import '../data/session.dart';
-import 'health_card_view.dart';
 import '../data/models/evaluation_input.dart';
 
 class HistoryView extends StatefulWidget {
-  final Function(Widget)? onNavigate;
-  const HistoryView({super.key, this.onNavigate});
+  const HistoryView({super.key});
 
   @override
   State<HistoryView> createState() => _HistoryViewState();
@@ -16,6 +15,7 @@ class HistoryView extends StatefulWidget {
 
 class _HistoryViewState extends State<HistoryView> {
   final GradeRepository _repo = GradeRepository();
+  final ScrollController _horizontalScroll = ScrollController();
   List<Map<String, dynamic>> _evaluations = [];
   bool _loading = true;
   String? _error;
@@ -248,9 +248,13 @@ class _HistoryViewState extends State<HistoryView> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
+        child: Scrollbar(
+          controller: _horizontalScroll,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _horizontalScroll,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
             headingRowColor: WidgetStateProperty.resolveWith<Color>((_) => Colors.grey.shade50),
             headingRowHeight: 56,
             dataRowMinHeight: 80,
@@ -435,34 +439,25 @@ class _HistoryViewState extends State<HistoryView> {
                   DataCell(
                     InkWell(
                       onTap: () {
-                        if (widget.onNavigate != null) {
-                          final photos = (ev['photoUrls'] as List?)?.map((e) => e.toString()).toList();
-                          final e = EvaluationInput(
-                            evaluationId: ev['evaluationId']?.toString(),
-                            productName: ev['productName']?.toString(),
-                            category: ev['category']?.toString(),
-                            reason: ev['reason']?.toString(),
-                            condition: condition,
-                            conditionReason: ev['conditionReason']?.toString(),
-                            estimatedResaleValue: resale,
-                            finalDisposition: ev['finalDisposition']?.toString(),
-                            chosenDisposition: ev['chosenDisposition']?.toString(),
-                            recommendedRoute: ev['recommendedRoute']?.toString(),
-                            nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
-                            photoUrls: photos,
-                            bestPhotoIndex: ev['bestPhotoIndex'] as int?,
-                            distanceKm: ev['distanceKm'] as num?,
-                            resaleCount: (ev['resaleCount'] as num?)?.toInt(),
-                          );
-                          widget.onNavigate!(HealthCardView(
-                            onNavigate: widget.onNavigate,
-                            evaluation: e,
-                            readOnly: true,
-                            onFinishToHistory: () => widget.onNavigate!(
-                              HistoryView(onNavigate: widget.onNavigate),
-                            ),
-                          ));
-                        }
+                        final photos = (ev['photoUrls'] as List?)?.map((e) => e.toString()).toList();
+                        final e = EvaluationInput(
+                          evaluationId: ev['evaluationId']?.toString(),
+                          productName: ev['productName']?.toString(),
+                          category: ev['category']?.toString(),
+                          reason: ev['reason']?.toString(),
+                          condition: condition,
+                          conditionReason: ev['conditionReason']?.toString(),
+                          estimatedResaleValue: resale,
+                          finalDisposition: ev['finalDisposition']?.toString(),
+                          chosenDisposition: ev['chosenDisposition']?.toString(),
+                          recommendedRoute: ev['recommendedRoute']?.toString(),
+                          nearestWarehouseId: ev['nearestWarehouseId']?.toString(),
+                          photoUrls: photos,
+                          bestPhotoIndex: ev['bestPhotoIndex'] as int?,
+                          distanceKm: ev['distanceKm'] as num?,
+                          resaleCount: (ev['resaleCount'] as num?)?.toInt(),
+                        );
+                        context.push('/seller/history/health', extra: e);
                       },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -485,6 +480,7 @@ class _HistoryViewState extends State<HistoryView> {
               );
             }).toList(),
           ),
+        ),
         ),
       ),
     );

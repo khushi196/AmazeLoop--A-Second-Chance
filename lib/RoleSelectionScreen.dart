@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
-import 'BuyerDashboard.dart';
-import 'SellerTypeScreen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -92,12 +91,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                               subtitle: 'Browse and buy quality pre-owned tech',
                               icon: Icons.shopping_cart_outlined,
                               iconBgColor: amazonNavy,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const BuyerDashboard()),
-                                );
-                              },
+                              onTap: () => context.go('/buyer/market'),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -108,12 +102,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                               subtitle: 'Sell or trade in your used tech',
                               icon: Icons.inventory_2_outlined,
                               iconBgColor: amazonOrange,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const SellerTypeScreen()),
-                                );
-                              },
+                              onTap: () => context.go('/sell'),
                             ),
                           ),
                         ],

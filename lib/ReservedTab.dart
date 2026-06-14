@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
 import 'data/models/purchase.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
-import 'ListingDetailScreen.dart';
-import 'views/login_view.dart';
 
 /// Shows the buyer's active reservations (24h holds) with a Buy action and a
 /// time-remaining indicator. Items not bought before expiry are released by
@@ -138,13 +137,7 @@ class ReservedTabState extends State<ReservedTab> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginView()),
-                );
-                if (mounted) setState(_maybeLoad);
-              },
+              onPressed: () => context.push('/login'),
             ),
           ],
         ),
@@ -191,12 +184,37 @@ class ReservedTabState extends State<ReservedTab> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Items you\'ve reserved are shown here. Complete your purchase before the timer runs out.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Items you\'ve reserved are shown here. Complete your purchase before the timer runs out.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: amazonOrange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: amazonOrange.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            '${reserved.length} / 5 slots used',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: reserved.length >= 5
+                                  ? Colors.red.shade700
+                                  : amazonOrange,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
 
@@ -332,12 +350,8 @@ class ReservedTabState extends State<ReservedTab> {
               Row(
                 children: [
                   OutlinedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ListingDetailScreen(listingId: p.evaluationId),
-                      ),
-                    ),
+                    onPressed: () =>
+                        context.push('/listing/${p.evaluationId}'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textPrimary,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

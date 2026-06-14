@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/report_generator.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/sustainability.dart' as sustain;
-import 'submit_item_view.dart';
 
 class HealthCardView extends StatelessWidget {
-  final Function(Widget)? onNavigate;
-  final Function()? onFinishToHistory;
   final EvaluationInput? evaluation;
   /// When true, the card is being viewed for an already-routed item (e.g. from
   /// the History tab), so the primary action is "Back to History" rather than
@@ -16,9 +14,7 @@ class HealthCardView extends StatelessWidget {
   final bool readOnly;
   const HealthCardView({
     super.key,
-    this.onNavigate,
     this.evaluation,
-    this.onFinishToHistory,
     this.readOnly = false,
   });
 
@@ -569,19 +565,7 @@ class HealthCardView extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (onFinishToHistory != null) {
-                            onFinishToHistory!();
-                          } else if (onNavigate != null) {
-                            onNavigate!(SubmitItemView(onNavigate: onNavigate));
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Item routed. Check the History tab to track its status.'),
-                              ),
-                            );
-                          }
-                        },
+                        onPressed: () => context.go('/seller/history'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: amazonOrange,
                           foregroundColor: Colors.white,

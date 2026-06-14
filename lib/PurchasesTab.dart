@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
 import 'data/models/purchase.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
-import 'ListingDetailScreen.dart';
-import 'views/login_view.dart';
 
 class PurchasesTab extends StatefulWidget {
   const PurchasesTab({super.key});
@@ -140,13 +139,7 @@ class PurchasesTabState extends State<PurchasesTab> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginView()),
-                );
-                if (mounted) setState(_maybeLoad);
-              },
+              onPressed: () => context.push('/login'),
             ),
           ],
         ),
@@ -338,16 +331,10 @@ class PurchasesTabState extends State<PurchasesTab> {
   }
 
   void _viewHealthCard(Purchase p) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ListingDetailScreen(
-          listingId: p.evaluationId,
-          purchaseStatus: p.purchaseStatus,
-          purchaseDate: p.purchaseTimestamp,
-        ),
-      ),
-    );
+    context.push('/listing/${p.evaluationId}', extra: {
+      'purchaseStatus': p.purchaseStatus,
+      'purchaseDate': p.purchaseTimestamp,
+    });
   }
 
   Widget _thumb(String? url) {

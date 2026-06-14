@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
-import '../BuyerDashboard.dart';
-import '../SellIntroScreen.dart';
+import 'package:go_router/go_router.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/session.dart';
 
@@ -247,38 +246,21 @@ class _LoginViewState extends State<LoginView> {
   /// for their entry path and role, and clears the navigation stack so
   /// back-button can't drop them back into the login form.
   void _routeByRole() {
-    Widget destination;
     switch (widget.entry) {
       case LoginEntry.warehouseSell:
-        // Warehouse path: always end at the seller dashboard.
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/dashboard',
-          (route) => false,
-        );
-        return;
+        context.go('/seller/grade');
+        break;
       case LoginEntry.customerSell:
-        // Customer "I want to sell" path: end at the Sell Intro.
-        destination = const SellIntroScreen();
+        context.go('/sell/intro');
         break;
       case LoginEntry.buyer:
-        // Marketplace gate / general buyer path: route by stored role.
         if (Session.role == 'warehouse') {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/dashboard',
-            (route) => false,
-          );
-          return;
+          context.go('/seller/grade');
+        } else {
+          context.go('/buyer/market');
         }
-        destination = const BuyerDashboard();
         break;
     }
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => destination),
-      (route) => false,
-    );
   }
 
   /// Shows a dialog prompting the user for their email verification code.
@@ -313,6 +295,24 @@ class _LoginViewState extends State<LoginView> {
                   Text(
                     email,
                     style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 14, color: Colors.grey.shade600),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          "Don't see it? Please check your spam or junk folder.",
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   TextField(
@@ -614,6 +614,24 @@ class _LoginViewState extends State<LoginView> {
                   Text(
                     "We've sent a code to $email",
                     style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 14, color: Colors.grey.shade600),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          "Don't see it? Please check your spam or junk folder.",
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   TextField(

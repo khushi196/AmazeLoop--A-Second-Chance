@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
 import 'data/models/listing.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
-import 'ListingDetailScreen.dart';
 
 class MarketplaceTab extends StatefulWidget {
   final VoidCallback? onNotificationsTap;
@@ -367,7 +367,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
               IconButton(
                 icon: const Icon(Icons.notifications_none,
                     color: Colors.white70, size: 22),
-                onPressed: widget.onNotificationsTap,
+                onPressed: () => context.go('/buyer/notifications'),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -464,13 +464,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
   Widget _buildCard(Listing listing) {
     final isWishlisted = _wishlisted.contains(listing.listingId);
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              ListingDetailScreen(listingId: listing.listingId),
-        ),
-      ),
+      onTap: () => context.push('/listing/${listing.listingId}'),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,

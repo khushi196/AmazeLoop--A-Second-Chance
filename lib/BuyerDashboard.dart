@@ -1,50 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
-import 'RoleSelectionScreen.dart';
-import 'MarketplaceTab.dart';
-import 'ReservedTab.dart';
-import 'PurchasesTab.dart';
-import 'NotificationsTab.dart';
 import 'data/session.dart';
 
-/// Top-level shell for buyers and guest browsers. The Sell / Trade-in flow
-/// lives behind the entry screen, not in this dashboard.
-class BuyerDashboard extends StatefulWidget {
-  const BuyerDashboard({super.key});
+/// Top-level shell for buyers and guest browsers. Hosts the four tab branches
+/// (Marketplace / Reserved / My Purchases / Notifications) via a
+/// [StatefulNavigationShell], so each tab is its own URL and the browser
+/// back/forward arrows move between them. The Sell / Trade-in flow lives behind
+/// the entry screen, not in this dashboard.
+class BuyerDashboard extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
+  const BuyerDashboard({super.key, required this.navigationShell});
 
-  @override
-  State<BuyerDashboard> createState() => _BuyerDashboardState();
-}
-
-class _BuyerDashboardState extends State<BuyerDashboard> {
-  int _currentIndex = 0;
-  final GlobalKey<ReservedTabState> _reservedKey =
-      GlobalKey<ReservedTabState>();
-  final GlobalKey<PurchasesTabState> _purchasesKey =
-      GlobalKey<PurchasesTabState>();
-  final GlobalKey<NotificationsTabState> _notificationsKey =
-      GlobalKey<NotificationsTabState>();
-
-  late final List<Widget> _views = [
-    MarketplaceTab(
-      onNotificationsTap: () {
-        setState(() => _currentIndex = 3);
-        _notificationsKey.currentState?.reload();
-      },
-    ),
-    ReservedTab(key: _reservedKey),
-    PurchasesTab(key: _purchasesKey),
-    NotificationsTab(key: _notificationsKey),
-  ];
-
-  /// Returns to the role-selection entry screen (choose Buy vs Sell) without
-  /// signing the user out — the session is preserved if they were logged in.
-  void _goToMainMenu(BuildContext context) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-      (route) => false,
+  void _goBranch(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
     );
   }
 
@@ -84,56 +56,13 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                 ),
                 const SizedBox(height: 16),
 
-                // Back to the main entry screen (choose Buy vs Sell).
-                InkWell(
-                  onTap: () => _goToMainMenu(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.arrow_back, color: Colors.white70, size: 18),
-                        SizedBox(width: 12),
-                        Text(
-                          'Back to main menu',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                _buildNavItem(
-                  icon: Icons.storefront,
-                  title: 'Marketplace',
-                  index: 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.bookmark_outline,
-                  title: 'Reserved',
-                  index: 1,
-                ),
-                _buildNavItem(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'My Purchases',
-                  index: 2,
-                ),
-                _buildNavItem(
-                  icon: Icons.notifications_none,
-                  title: 'Notifications',
-                  index: 3,
-                ),
+                _buildNavItem(icon: Icons.storefront, title: 'Marketplace', index: 0),
+                _buildNavItem(icon: Icons.bookmark_outline, title: 'Reserved', index: 1),
+                _buildNavItem(icon: Icons.shopping_bag_outlined, title: 'My Purchases', index: 2),
+                _buildNavItem(icon: Icons.notifications_none, title: 'Notifications', index: 3),
 
                 const Spacer(),
 
-                // When the user is a signed-in buyer, show an account/logout button.
-                // When they are a guest (no token), show "Switch Role" so they can
-                // navigate back to the entry screen.
                 if (Session.isSignedIn)
                   InkWell(
                     onTap: () async {
@@ -142,49 +71,29 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                       } catch (_) {}
                       Session.clear();
                       if (!context.mounted) return;
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const RoleSelectionScreen()),
-                        (route) => false,
-                      );
+                      context.go('/');
                     },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 24),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                       child: Row(
-                        children: const [
+                        children: [
                           Icon(Icons.logout, color: Colors.grey),
                           SizedBox(width: 16),
-                          Text(
-                            'Logout',
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
-                          ),
+                          Text('Logout', style: TextStyle(color: Colors.grey, fontSize: 16)),
                         ],
                       ),
                     ),
                   )
                 else
                   InkWell(
-                    onTap: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const RoleSelectionScreen()),
-                        (route) => false,
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 24),
+                    onTap: () => context.go('/'),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                       child: Row(
-                        children: const [
+                        children: [
                           Icon(Icons.arrow_back, color: Colors.grey),
                           SizedBox(width: 16),
-                          Text(
-                            'Switch Role',
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
-                          ),
+                          Text('Switch Role', style: TextStyle(color: Colors.grey, fontSize: 16)),
                         ],
                       ),
                     ),
@@ -192,12 +101,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
               ],
             ),
           ),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _views,
-            ),
-          ),
+          Expanded(child: navigationShell),
         ],
       ),
     );
@@ -208,27 +112,10 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     required String title,
     required int index,
   }) {
-    final bool isSelected = _currentIndex == index;
+    final bool isSelected = navigationShell.currentIndex == index;
 
     return InkWell(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-        // Refresh the relevant tab when opened so newly reserved/bought items
-        // and fresh notifications appear without a manual pull-to-refresh.
-        switch (index) {
-          case 1:
-            _reservedKey.currentState?.reload();
-            break;
-          case 2:
-            _purchasesKey.currentState?.reload();
-            break;
-          case 3:
-            _notificationsKey.currentState?.reload();
-            break;
-        }
-      },
+      onTap: () => _goBranch(index),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF131A22) : Colors.transparent,

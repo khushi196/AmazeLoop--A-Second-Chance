@@ -1,16 +1,14 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
-import 'grading_result_view.dart';
 
 class SubmitItemView extends StatefulWidget {
-  final Function(Widget)? onNavigate;
-  final Function()? onFinishToHistory;
-  const SubmitItemView({super.key, this.onNavigate, this.onFinishToHistory});
+  const SubmitItemView({super.key});
 
   @override
   State<SubmitItemView> createState() => _SubmitItemViewState();
@@ -123,15 +121,7 @@ class _SubmitItemViewState extends State<SubmitItemView> {
       if (!mounted) return;
       setState(() => _isGrading = false);
 
-      if (widget.onNavigate != null) {
-        widget.onNavigate!(
-          GradingResultView(
-            onNavigate: widget.onNavigate,
-            evaluation: result,
-            onFinishToHistory: widget.onFinishToHistory,
-          ),
-        );
-      }
+      context.push('/seller/grade/result', extra: result);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isGrading = false);
@@ -325,7 +315,7 @@ class _SubmitItemViewState extends State<SubmitItemView> {
                 child: _buildTextField(
                   label: 'Order ID / Cost (₹)',
                   controller: _orderOrPriceController,
-                  hint: 'Enter order ID or cost',
+                  hint: 'e.g. ORD-101 or 15000',
                 ),
               ),
             ],

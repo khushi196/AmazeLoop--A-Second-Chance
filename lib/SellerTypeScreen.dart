@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
-import 'views/login_view.dart';
 
 class SellerTypeScreen extends StatelessWidget {
   const SellerTypeScreen({super.key});
@@ -95,14 +95,7 @@ class SellerTypeScreen extends StatelessWidget {
                               subtitle: 'List items from your warehouse or returned stock.',
                               icon: Icons.warehouse_outlined,
                               iconBgColor: amazonNavy,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginView(entry: LoginEntry.warehouseSell),
-                                  ),
-                                );
-                              },
+                              onTap: () => context.go('/login?entry=warehouseSell'),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -112,14 +105,7 @@ class SellerTypeScreen extends StatelessWidget {
                               subtitle: 'List items from individual trade-in or pre-owned.',
                               icon: Icons.inventory_2_outlined,
                               iconBgColor: amazonOrange,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginView(entry: LoginEntry.customerSell),
-                                  ),
-                                );
-                              },
+                              onTap: () => context.go('/login?entry=customerSell'),
                             ),
                           ),
                         ],

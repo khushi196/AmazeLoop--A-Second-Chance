@@ -43,6 +43,10 @@ dependencies:
   # Networking
   http: ^1.2.0
 
+  # URL-based routing so every screen/tab/wizard step is browsable with the
+  # browser back/forward arrows (and refresh/bookmark).
+  go_router: ^14.2.7
+
   # Image handling (already transitive via image_picker — made explicit for
   # the AVIF → JPEG conversion in submit_item_view.dart)
   image: ^4.8.0

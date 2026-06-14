@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
-import 'views/dashboard_layout.dart';
 
 class SellIntroScreen extends StatelessWidget {
   const SellIntroScreen({super.key});
@@ -152,12 +152,7 @@ class SellIntroScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const DashboardLayout()),
-                          );
-                        },
+                        onPressed: () => context.go('/seller/grade'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: amazonOrange,
                           foregroundColor: Colors.white,
@@ -182,14 +177,7 @@ class SellIntroScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DashboardLayout(startOnHistory: true),
-                            ),
-                          );
-                        },
+                        onPressed: () => context.go('/seller/history'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),

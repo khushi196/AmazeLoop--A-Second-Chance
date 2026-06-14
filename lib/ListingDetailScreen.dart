@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'constants.dart';
 import 'data/models/listing.dart';
 import 'data/models/listing_detail.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
 import 'data/sustainability.dart' as sustain;
-import 'views/login_view.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   final String listingId;
@@ -1034,10 +1034,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Sign in as a customer to $verb this item.')),
     );
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginView()),
-    );
+    context.push('/login');
     return false;
   }
 

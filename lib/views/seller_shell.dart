@@ -1,50 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
-import 'submit_item_view.dart';
-import 'history_view.dart';
-import '../RoleSelectionScreen.dart';
+import 'package:go_router/go_router.dart';
 import '../data/session.dart';
 
-class DashboardLayout extends StatefulWidget {
-  /// When true the dashboard opens on the History tab instead of Grade New Item.
-  /// Used by SellIntroScreen's "Maybe later" button.
-  final bool startOnHistory;
-  const DashboardLayout({super.key, this.startOnHistory = false});
-
-  @override
-  State<DashboardLayout> createState() => _DashboardLayoutState();
-}
-
-class _DashboardLayoutState extends State<DashboardLayout> {
-  late int _selectedIndex = widget.startOnHistory ? 1 : 0;
-  Widget? _currentCustomView;
-
-  // A method to swap the main content area from any child screen
-  void _changeView(Widget newView) {
-    setState(() {
-      _currentCustomView = newView;
-    });
-  }
-
-  // Navigates back to the History tab and clears any custom view
-  void _goToHistory() {
-    setState(() {
-      _selectedIndex = 1;
-      _currentCustomView = null;
-    });
-  }
+/// Seller dashboard chrome (left sidebar + top bar) that wraps the routed
+/// content (`/seller/grade`, `/seller/history`, and the wizard steps). Hosting
+/// the steps as routes means the browser back/forward arrows move between
+/// Grade → Result → Route → Health Card and History.
+class SellerShell extends StatelessWidget {
+  final Widget child;
+  const SellerShell({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    // Determine what to show in the main area
-    Widget mainContent;
-    if (_currentCustomView != null) {
-      mainContent = _currentCustomView!;
-    } else {
-      mainContent = _selectedIndex == 0 
-          ? SubmitItemView(onNavigate: _changeView, onFinishToHistory: _goToHistory) 
-          : HistoryView(key: UniqueKey(), onNavigate: _changeView);
-    }
+    final location = GoRouterState.of(context).uri.path;
+    final onHistory = location.startsWith('/seller/history');
+    final onGrade = !onHistory; // grade + its wizard steps
 
     return Scaffold(
       body: Row(
@@ -52,7 +23,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
           // --- Left Sidebar ---
           Container(
             width: 250,
-            color: const Color(0xFF232F3E), // Amazon Squid Ink
+            color: const Color(0xFF232F3E),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -67,8 +38,8 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                     ],
                   ),
                 ),
-                _buildNavItem(0, 'Grade New Item', Icons.add_box),
-                _buildNavItem(1, 'History', Icons.history),
+                _navItem(context, 'Grade New Item', Icons.add_box, onGrade, '/seller/grade'),
+                _navItem(context, 'History', Icons.history, onHistory, '/seller/history'),
                 const Spacer(),
                 InkWell(
                   onTap: () async {
@@ -77,12 +48,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                     } catch (_) {}
                     Session.clear();
                     if (!context.mounted) return;
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const RoleSelectionScreen()),
-                      (route) => false,
-                    );
+                    context.go('/');
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -111,26 +77,6 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
-                      // Back to the main entry screen (choose Buy vs Sell).
-                      TextButton.icon(
-                        onPressed: () {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const RoleSelectionScreen()),
-                            (route) => false,
-                          );
-                        },
-                        icon: const Icon(Icons.arrow_back,
-                            color: Colors.white70, size: 18),
-                        label: const Text(
-                          'Main menu',
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ),
                       const Spacer(),
                       SizedBox(
                         width: 250,
@@ -146,23 +92,18 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                         ),
                       ),
                       const SizedBox(width: 24),
-                      IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white70), onPressed: () {
-                        setState(() {
-                          _selectedIndex = 1;
-                          _currentCustomView = null;
-                        });
-                      }),
-                      IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white70), onPressed: null),
+                      IconButton(
+                        icon: const Icon(Icons.history, color: Colors.white70),
+                        tooltip: 'History',
+                        onPressed: () => context.go('/seller/history'),
+                      ),
                       const SizedBox(width: 16),
                       const CircleAvatar(radius: 16, backgroundColor: Color(0xFFFF9900), child: Icon(Icons.person, size: 18, color: Colors.white)),
                     ],
                   ),
                 ),
-                
-                // Dynamic Page Content (This is what changes!)
-                Expanded(
-                  child: mainContent,
-                ),
+
+                Expanded(child: child),
               ],
             ),
           ),
@@ -171,15 +112,9 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     );
   }
 
-  Widget _buildNavItem(int index, String title, IconData icon) {
-    final isSelected = _selectedIndex == index && _currentCustomView == null;
+  Widget _navItem(BuildContext context, String title, IconData icon, bool isSelected, String route) {
     return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-          _currentCustomView = null; // Reset any custom view when clicking the sidebar
-        });
-      },
+      onTap: () => context.go(route),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF131A22) : Colors.transparent,

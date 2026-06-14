@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/route_helpers.dart';
 import '../data/session.dart';
-import 'health_card_view.dart';
 
 class RoutingDecisionView extends StatefulWidget {
-  final Function(Widget)? onNavigate;
-  final Function()? onFinishToHistory;
   final EvaluationInput? evaluation;
-  const RoutingDecisionView({super.key, this.onNavigate, this.evaluation, this.onFinishToHistory});
+  const RoutingDecisionView({super.key, this.evaluation});
 
   @override
   State<RoutingDecisionView> createState() => _RoutingDecisionViewState();
@@ -128,13 +126,7 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
         ..isOverride = isOverride;
       if (!mounted) return;
       setState(() => _confirming = false);
-      if (widget.onNavigate != null) {
-        widget.onNavigate!(HealthCardView(
-          onNavigate: widget.onNavigate,
-          evaluation: widget.evaluation,
-          onFinishToHistory: widget.onFinishToHistory,
-        ));
-      }
+      context.push('/seller/grade/health', extra: widget.evaluation);
     } catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
