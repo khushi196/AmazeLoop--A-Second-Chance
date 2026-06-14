@@ -4,6 +4,7 @@ import 'data/models/listing.dart';
 import 'data/models/listing_detail.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
+import 'data/sustainability.dart' as sustain;
 import 'views/login_view.dart';
 
 class ListingDetailScreen extends StatefulWidget {
@@ -661,6 +662,15 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     final co2 = hc.circularImpactKg;
     final reverseKm = hc.reverseShippingAvoidedKm;
     final transportCo2 = hc.co2SavedKg;
+    final isUnusedAtHome = l.topReturnReason == 'Unused at home';
+    final sustainabilitySummary = sustain.buildSustainabilityImpact(
+      sourceReason: l.topReturnReason ?? '',
+      disposition: hc.finalDisposition ?? '',
+      reverseKm: (reverseKm ?? 0).toDouble(),
+      transportCo2Kg: transportCo2 ?? 0,
+      reuseCo2Kg: co2 ?? 0,
+      ownersTotal: hc.owners + 1,
+    );
 
     return Container(
       width: double.infinity,
@@ -818,6 +828,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    sustainabilitySummary,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Colors.green.shade900,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Icon(Icons.eco_outlined,
@@ -836,7 +856,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                       ),
                     ],
                   ),
-                  if (reverseKm != null && reverseKm > 0) ...[
+                  if (reverseKm != null && reverseKm > 0 && !isUnusedAtHome) ...[
                     const SizedBox(height: 10),
                     Row(
                       children: [

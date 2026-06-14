@@ -82,6 +82,7 @@ export const handler = async (event) => {
     createdAt: it.createdAt,
     productName: it.productName,
     category: it.category,
+    reason: it.reason ?? null,
     condition: it.condition,
     conditionReason: it.conditionReason,
     finalDisposition: it.finalDisposition,

@@ -441,6 +441,7 @@ class _HistoryViewState extends State<HistoryView> {
                             evaluationId: ev['evaluationId']?.toString(),
                             productName: ev['productName']?.toString(),
                             category: ev['category']?.toString(),
+                            reason: ev['reason']?.toString(),
                             condition: condition,
                             conditionReason: ev['conditionReason']?.toString(),
                             estimatedResaleValue: resale,

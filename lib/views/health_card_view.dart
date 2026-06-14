@@ -645,6 +645,17 @@ class HealthCardView extends StatelessWidget {
     final reverseKm = sustain.reverseShippingAvoidedKm(e.distanceKm);
     final transportCo2 = sustain.transportCo2SavedKg(e.distanceKm);
     final owners = 1 + (e.resaleCount ?? 0);
+    final isUnusedAtHome = e.reason == 'Unused at home';
+
+    // Deterministic, honest narrative summary (no LLM).
+    final summary = sustain.buildSustainabilityImpact(
+      sourceReason: e.reason ?? '',
+      disposition: e.chosenDisposition ?? e.finalDisposition ?? '',
+      reverseKm: hasDistance ? reverseKm.toDouble() : 0,
+      transportCo2Kg: hasDistance ? transportCo2 : 0,
+      reuseCo2Kg: manufacturingCo2,
+      ownersTotal: owners + 1,
+    );
 
     return Container(
       width: double.infinity,
@@ -687,6 +698,25 @@ class HealthCardView extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          // Deterministic narrative summary.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: Text(
+              summary,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.green.shade900,
+                height: 1.5,
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           _sustainRow(
             Icons.recycling_outlined,
@@ -694,7 +724,7 @@ class HealthCardView extends StatelessWidget {
             '${manufacturingCo2.toStringAsFixed(0)} kg',
             'Vs. manufacturing a new unit (approx.)',
           ),
-          if (hasDistance) ...[
+          if (hasDistance && !isUnusedAtHome) ...[
             const SizedBox(height: 16),
             _sustainRow(
               Icons.local_shipping_outlined,
