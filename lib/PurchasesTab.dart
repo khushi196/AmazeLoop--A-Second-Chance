@@ -341,7 +341,11 @@ class PurchasesTabState extends State<PurchasesTab> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ListingDetailScreen(listingId: p.evaluationId),
+        builder: (_) => ListingDetailScreen(
+          listingId: p.evaluationId,
+          purchaseStatus: p.purchaseStatus,
+          purchaseDate: p.purchaseTimestamp,
+        ),
       ),
     );
   }

@@ -10,11 +10,16 @@ class HealthCardView extends StatelessWidget {
   final Function(Widget)? onNavigate;
   final Function()? onFinishToHistory;
   final EvaluationInput? evaluation;
+  /// When true, the card is being viewed for an already-routed item (e.g. from
+  /// the History tab), so the primary action is "Back to History" rather than
+  /// the end-of-pipeline "Confirm & Route".
+  final bool readOnly;
   const HealthCardView({
     super.key,
     this.onNavigate,
     this.evaluation,
     this.onFinishToHistory,
+    this.readOnly = false,
   });
 
   String? _heroPhotoUrl(EvaluationInput? e) {
@@ -586,9 +591,9 @@ class HealthCardView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'CONFIRM & ROUTE',
-                          style: TextStyle(
+                        child: Text(
+                          readOnly ? 'BACK TO HISTORY' : 'CONFIRM & ROUTE',
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,

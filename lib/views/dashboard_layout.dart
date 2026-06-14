@@ -110,8 +110,28 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                   color: const Color(0xFF232F3E),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      // Back to the main entry screen (choose Buy vs Sell).
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const RoleSelectionScreen()),
+                            (route) => false,
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_back,
+                            color: Colors.white70, size: 18),
+                        label: const Text(
+                          'Main menu',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      const Spacer(),
                       SizedBox(
                         width: 250,
                         height: 36,

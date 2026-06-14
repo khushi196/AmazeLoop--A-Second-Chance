@@ -8,7 +8,17 @@ import 'views/login_view.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   final String listingId;
-  const ListingDetailScreen({super.key, required this.listingId});
+  /// When this screen is opened for an item the user already bought (from the
+  /// My Purchases tab), these carry the purchase state so we show a purchase
+  /// summary instead of Buy/Reserve actions.
+  final String? purchaseStatus;
+  final DateTime? purchaseDate;
+  const ListingDetailScreen({
+    super.key,
+    required this.listingId,
+    this.purchaseStatus,
+    this.purchaseDate,
+  });
 
   @override
   State<ListingDetailScreen> createState() => _ListingDetailScreenState();
@@ -332,18 +342,85 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
         ),
         const SizedBox(height: 24),
-        // Buy Now button
-        SizedBox(
-          width: double.infinity,
-          child: _buildBuyNowButton(l.evaluationId),
-        ),
-        const SizedBox(height: 12),
-        // Reserve button
-        SizedBox(
-          width: double.infinity,
-          child: _buildReserveButton(l.evaluationId),
-        ),
+        // If the user already owns this item (opened from My Purchases), show
+        // a purchase summary instead of the Buy Now / Reserve actions.
+        if (_ownedView)
+          _buildPurchasedPanel()
+        else ...[
+          // Buy Now button
+          SizedBox(
+            width: double.infinity,
+            child: _buildBuyNowButton(l.evaluationId),
+          ),
+          const SizedBox(height: 12),
+          // Reserve button
+          SizedBox(
+            width: double.infinity,
+            child: _buildReserveButton(l.evaluationId),
+          ),
+        ],
       ],
+    );
+  }
+
+  /// True when this screen was opened for an item the buyer already purchased.
+  bool get _ownedView => widget.purchaseStatus == 'SOLD' || _outcome == 'SOLD';
+
+  String _formatPurchaseDate(DateTime? d) {
+    if (d == null) return '—';
+    final local = d.toLocal();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final hour = local.hour > 12
+        ? local.hour - 12
+        : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '${local.day} ${months[local.month - 1]} ${local.year}, '
+        '${hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  Widget _buildPurchasedPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Purchased',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.purchaseDate != null
+                      ? 'Ordered on ${_formatPurchaseDate(widget.purchaseDate)}'
+                      : 'This item is in your purchases.',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

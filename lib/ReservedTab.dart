@@ -20,6 +20,7 @@ class ReservedTabState extends State<ReservedTab> {
   final GradeRepository _repo = GradeRepository();
   Future<List<Purchase>>? _future;
   String? _buyingId;
+  String? _cancelId;
 
   @override
   void initState() {
@@ -227,6 +228,7 @@ class ReservedTabState extends State<ReservedTab> {
     final expiry = p.reservationExpiresAt;
     final expired = expiry != null && expiry.toLocal().isBefore(DateTime.now());
     final isBuying = _buyingId == p.evaluationId;
+    final isCancelling = _cancelId == p.evaluationId;
     final conditionColor = _getConditionColor(p.condition);
 
     return Container(
@@ -384,6 +386,31 @@ class ReservedTabState extends State<ReservedTab> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              // Remove the reservation → release the item back to the
+              // marketplace (seller history shows "Listed - not bought").
+              TextButton.icon(
+                onPressed: isCancelling ? null : () => _cancel(p),
+                icon: isCancelling
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.red.shade400),
+                      )
+                    : Icon(Icons.close, size: 16, color: Colors.red.shade400),
+                label: Text(
+                  'Remove & relist',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.w600),
+                ),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
             ],
           ),
         ],
@@ -409,6 +436,64 @@ class ReservedTabState extends State<ReservedTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _buyingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _cancel(Purchase p) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          'Remove reservation?',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Text(
+          '"${p.title}" will be released and listed on the marketplace again. '
+          'This cancels your 24h hold.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    setState(() => _cancelId = p.evaluationId);
+    try {
+      await _repo.cancelReservation(p.evaluationId);
+      if (!mounted) return;
+      setState(() {
+        _cancelId = null;
+        _maybeLoad();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade700,
+          content: Text('"${p.title}" removed and relisted on the marketplace.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cancelId = null);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,

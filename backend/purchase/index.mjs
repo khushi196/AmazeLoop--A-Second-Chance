@@ -94,8 +94,8 @@ export const handler = async (event) => {
   }
 
   const action = (body.action || "RESERVE").toUpperCase();
-  if (action !== "RESERVE" && action !== "BUY") {
-    return response(400, { error: "action must be RESERVE or BUY." });
+  if (action !== "RESERVE" && action !== "BUY" && action !== "CANCEL") {
+    return response(400, { error: "action must be RESERVE, BUY, or CANCEL." });
   }
 
   const restClaims = event?.requestContext?.authorizer?.claims;
@@ -128,6 +128,56 @@ export const handler = async (event) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const title = item.productName || "your item";
+
+  // -------------------------------------------------------------------------
+  // CANCEL — the buyer releases their own reservation back to the marketplace.
+  // Clears the buyer fields so the item is listable again; the seller's
+  // history then shows it as "Listed - not bought".
+  // -------------------------------------------------------------------------
+  if (action === "CANCEL") {
+    if (item.purchaseStatus !== "RESERVED" || item.buyerUserId !== buyerUserId) {
+      return response(409, {
+        error: "You don't have an active reservation on this item.",
+      });
+    }
+    try {
+      await ddb.send(
+        new UpdateCommand({
+          TableName: EVALUATIONS_TABLE,
+          Key: { evaluationId },
+          UpdateExpression:
+            "REMOVE buyerUserId, purchaseStatus, purchaseTimestamp, reservationExpiresAt",
+          ConditionExpression: "buyerUserId = :b AND purchaseStatus = :r",
+          ExpressionAttributeValues: { ":b": buyerUserId, ":r": "RESERVED" },
+        })
+      );
+    } catch (e) {
+      if (e.name === "ConditionalCheckFailedException") {
+        return response(409, { error: "This reservation is no longer active." });
+      }
+      return response(500, {
+        error: "Failed to cancel reservation.",
+        detail: e.message,
+      });
+    }
+
+    // Notify the seller that their item is back on the marketplace.
+    if (item.userId && item.userId !== buyerUserId) {
+      await notify(
+        item.userId,
+        "LISTING_RELISTED",
+        "Your item is listed again",
+        `The reservation on your "${title}" was cancelled, so it's back on the marketplace.`,
+        evaluationId
+      );
+    }
+
+    return response(200, {
+      evaluationId,
+      purchaseStatus: "AVAILABLE",
+      released: true,
+    });
+  }
 
   // Determine current ownership, treating an expired reservation as free.
   const reservedByOther =

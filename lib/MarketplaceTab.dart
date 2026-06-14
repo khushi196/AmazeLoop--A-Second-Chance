@@ -15,7 +15,13 @@ class MarketplaceTab extends StatefulWidget {
 
 class _MarketplaceTabState extends State<MarketplaceTab> {
   final GradeRepository _repo = GradeRepository();
-  late Future<List<Listing>> _future;
+  static const int _pageSize = 50;
+  final List<Listing> _listings = [];
+  bool _loading = true; // initial load in progress
+  bool _loadingMore = false; // "Load more" request in flight
+  bool _hasMore = false;
+  int _nextOffset = 0;
+  String? _error;
   String _selectedFilter = 'All';
   final Set<String> _wishlisted = {};
   int _unreadCount = 0;
@@ -25,7 +31,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
   @override
   void initState() {
     super.initState();
-    _future = _repo.fetchListings();
+    _load();
     _loadUnread();
   }
 
@@ -43,10 +49,64 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
     } catch (_) {}
   }
 
+  /// Initial load (and refresh) — resets to the first page.
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final page = await _repo.fetchListingsPage(limit: _pageSize, offset: 0);
+      if (!mounted) return;
+      setState(() {
+        _listings
+          ..clear()
+          ..addAll(page.listings);
+        _hasMore = page.hasMore;
+        _nextOffset = page.nextOffset;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  /// Appends the next page of listings.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final page =
+          await _repo.fetchListingsPage(limit: _pageSize, offset: _nextOffset);
+      if (!mounted) return;
+      setState(() {
+        _listings.addAll(page.listings);
+        _hasMore = page.hasMore;
+        _nextOffset = page.nextOffset;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(
+              'Could not load more: ${e.toString().replaceFirst('Exception: ', '')}'),
+        ),
+      );
+    }
+  }
+
   Future<void> _refresh() async {
-    setState(() => _future = _repo.fetchListings());
     _loadUnread();
-    await _future;
+    await _load();
   }
 
   String _formatPrice(num value, String currency) {
@@ -86,112 +146,147 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
           _buildTopBar(),
           // ── Content ──────────────────────────────────────────────────────
           Expanded(
-            child: FutureBuilder<List<Listing>>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildShimmer();
-                }
-                if (snapshot.hasError) {
-                  return _buildError(snapshot.error.toString());
-                }
-                final listings = _filter(snapshot.data ?? const []);
-                return RefreshIndicator(
-                  onRefresh: _refresh,
-                  color: amazonOrange,
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [
-                                      _chip('All'),
-                                      const SizedBox(width: 8),
-                                      _chip('Like New'),
-                                      const SizedBox(width: 8),
-                                      _chip('Good'),
-                                      const SizedBox(width: 8),
-                                      _chip('Used'),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '${listings.length} items found',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Featured Listings',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Quality products. Second chance.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (listings.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _buildEmpty(),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          sliver: SliverGrid(
-                            gridDelegate:
-                                const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 280,
-                              childAspectRatio: 0.64,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) => _buildCard(listings[index]),
-                              childCount: listings.length,
-                            ),
-                          ),
-                        ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                    ],
-                  ),
-                );
-              },
-            ),
+            child: _loading
+                ? _buildShimmer()
+                : _error != null
+                    ? _buildError(_error!)
+                    : _buildList(),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Listings + Load more ───────────────────────────────────────────────────
+  Widget _buildList() {
+    final listings = _filter(_listings);
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: amazonOrange,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _chip('All'),
+                          const SizedBox(width: 8),
+                          _chip('Like New'),
+                          const SizedBox(width: 8),
+                          _chip('Good'),
+                          const SizedBox(width: 8),
+                          _chip('Used'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${listings.length} items found',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Featured Listings',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Quality products. Second chance.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (listings.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _buildEmpty(),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverGrid(
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 280,
+                  childAspectRatio: 0.64,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildCard(listings[index]),
+                  childCount: listings.length,
+                ),
+              ),
+            ),
+          if (_hasMore && listings.isNotEmpty)
+            SliverToBoxAdapter(child: _buildLoadMore()),
+          const SliverToBoxAdapter(child: SizedBox(height: 28)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadMore() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Center(
+        child: _loadingMore
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: amazonOrange),
+                ),
+              )
+            : OutlinedButton.icon(
+                onPressed: _loadMore,
+                icon: const Icon(Icons.expand_more, size: 20),
+                label: const Text(
+                  'Load more',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: textPrimary,
+                  side: BorderSide(color: Colors.grey.shade400),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
       ),
     );
   }

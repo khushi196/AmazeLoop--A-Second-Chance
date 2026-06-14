@@ -453,7 +453,14 @@ class _HistoryViewState extends State<HistoryView> {
                             distanceKm: ev['distanceKm'] as num?,
                             resaleCount: (ev['resaleCount'] as num?)?.toInt(),
                           );
-                          widget.onNavigate!(HealthCardView(onNavigate: widget.onNavigate, evaluation: e));
+                          widget.onNavigate!(HealthCardView(
+                            onNavigate: widget.onNavigate,
+                            evaluation: e,
+                            readOnly: true,
+                            onFinishToHistory: () => widget.onNavigate!(
+                              HistoryView(onNavigate: widget.onNavigate),
+                            ),
+                          ));
                         }
                       },
                       child: Row(

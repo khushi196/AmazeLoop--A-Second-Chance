@@ -18,6 +18,18 @@ class PurchaseConflictException implements Exception {
   String toString() => message;
 }
 
+/// One page of marketplace listings plus pagination state for "Load more".
+class ListingsPage {
+  final List<Listing> listings;
+  final bool hasMore;
+  final int nextOffset;
+  ListingsPage({
+    required this.listings,
+    required this.hasMore,
+    required this.nextOffset,
+  });
+}
+
 /// Talks to the real AmazeLoop backend (API Gateway).
 class GradeRepository {
   static const String _baseUrl =
@@ -251,6 +263,40 @@ class GradeRepository {
     }
   }
 
+  /// Fetches one page of the public marketplace feed for "Load more"
+  /// pagination. Returns the page plus whether more items remain and the
+  /// offset to request next.
+  Future<ListingsPage> fetchListingsPage({int limit = 50, int offset = 0}) async {
+    final uri = Uri.parse(_listingsUrl).replace(
+      queryParameters: {'limit': '$limit', 'offset': '$offset'},
+    );
+    late http.Response response;
+    try {
+      response = await http.get(uri, headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = decoded['listings'] as List? ?? const [];
+      final listings = items
+          .whereType<Map<String, dynamic>>()
+          .map(Listing.fromJson)
+          .toList();
+      final hasMore = decoded['hasMore'] == true;
+      final nextOffset =
+          (decoded['nextOffset'] as num?)?.toInt() ?? (offset + listings.length);
+      return ListingsPage(
+        listings: listings,
+        hasMore: hasMore,
+        nextOffset: nextOffset,
+      );
+    } else {
+      throw Exception('Failed to load listings (${response.statusCode}).');
+    }
+  }
+
   /// Fetches the full detail (listing + images + health card) for a listing.
   Future<ListingDetail> fetchListingDetail(String listingId) async {
     final uri = Uri.parse('$_listingsUrl/${Uri.encodeComponent(listingId)}');
@@ -322,6 +368,11 @@ class GradeRepository {
   /// Convenience: buy outright.
   Future<Map<String, dynamic>> buyListing(String evaluationId) =>
       purchaseListing(evaluationId, action: 'BUY');
+
+  /// Convenience: cancel the buyer's own reservation, releasing the item back
+  /// to the marketplace.
+  Future<Map<String, dynamic>> cancelReservation(String evaluationId) =>
+      purchaseListing(evaluationId, action: 'CANCEL');
 
   /// Fetches the authenticated buyer's items, optionally filtered by
   /// [status] ("SOLD" for My Purchases, "RESERVED" for the Reserved tab).

@@ -129,6 +129,7 @@ export const handler = async (event) => {
 
   const params = event?.queryStringParameters || {};
   const limit = Math.min(Number(params.limit) || 50, 100);
+  const offset = Math.max(Number(params.offset) || 0, 0);
 
   let items = [];
   try {
@@ -147,11 +148,22 @@ export const handler = async (event) => {
     return response(500, { error: "Failed to read evaluations.", detail: e.message });
   }
 
-  const listings = items
+  // Build the full ordered set of listable items, then return one page.
+  // Simple offset pagination keeps the createdAt-desc ordering correct across
+  // pages (a raw DynamoDB cursor wouldn't, because we sort after scanning).
+  const allListable = items
     .filter(isListable)
-    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
-    .slice(0, limit)
-    .map(toListing);
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-  return response(200, { listings });
+  const page = allListable.slice(offset, offset + limit).map(toListing);
+  const nextOffset = offset + limit;
+  const hasMore = nextOffset < allListable.length;
+
+  return response(200, {
+    listings: page,
+    total: allListable.length,
+    offset,
+    nextOffset: hasMore ? nextOffset : null,
+    hasMore,
+  });
 };

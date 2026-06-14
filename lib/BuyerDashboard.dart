@@ -38,6 +38,16 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     NotificationsTab(key: _notificationsKey),
   ];
 
+  /// Returns to the role-selection entry screen (choose Buy vs Sell) without
+  /// signing the user out — the session is preserved if they were logged in.
+  void _goToMainMenu(BuildContext context) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,6 +83,30 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Back to the main entry screen (choose Buy vs Sell).
+                InkWell(
+                  onTap: () => _goToMainMenu(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.arrow_back, color: Colors.white70, size: 18),
+                        SizedBox(width: 12),
+                        Text(
+                          'Back to main menu',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 _buildNavItem(
                   icon: Icons.storefront,

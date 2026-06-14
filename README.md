@@ -250,6 +250,11 @@ nobody opens the app; the lazy checks in `/listings` and `/purchases` keep reads
 | `GET /purchases` | **JWT** | Buyer's reserved/sold items |
 | `GET /notifications` | **JWT** | In-app notifications |
 
+> **Security note:** the `none`-auth routes above are public **for the hackathon demo only**.
+> `/grade`, `/ai-grade`, `/route`, and `/route/confirm` mutate core state, so in production they
+> would be **JWT-gated** (Cognito authorizer), with seller identity taken from token claims rather
+> than the request body. See [§9 Authentication and security model](#9-authentication-and-security-model).
+
 ---
 
 ## 6. Frontend — structure and screens
@@ -394,8 +399,19 @@ conditions — two simultaneous buyers, or a buy landing exactly as the sweep ru
   "you can only see/modify your own purchases and notifications" actually enforceable.
 - **Public endpoints:** `/listings` and `/listings/{id}` are intentionally open so guests can browse.
   The detail endpoint refuses to return non-listable items, so guessing IDs leaks nothing.
+- **Seller-flow routes are public for the hackathon demo only.** `/upload-url`, `/grade`,
+  `/ai-grade`, `/route`, `/route/confirm`, and `/evaluations` currently accept requests without a
+  JWT, even though several of them **mutate core state** (create evaluations, write AI grades, lock
+  dispositions). This keeps the demo frictionless. **In production these would be JWT-gated** behind
+  the same Cognito authorizer as the purchase/notification routes, with the seller's identity
+  (`userId`, `userRole`) read from the token claims (`sub`, `custom:role`) instead of the request
+  body — closing the impersonation and unauthenticated-write gaps. No workflow change is needed in
+  the app; only the authorizer attachment and the claim-vs-body identity source would change.
 - **Least privilege:** each Lambda has its own IAM role scoped to exactly the tables/actions it needs
   (e.g. the listing-detail role only has `dynamodb:GetItem` on `Evaluations`).
+- **Observability:** every Lambda emits structured logs to **Amazon CloudWatch** and basic metrics
+  (e.g. count of graded items and route/disposition distribution), so an ops team can monitor
+  throughput, error rates, and routing mix without extra tooling.
 
 ---
 
