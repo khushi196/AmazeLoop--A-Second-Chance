@@ -67,7 +67,7 @@ function riskBand(reason, condition) {
 }
 
 /** Determines whether a record should appear on the marketplace. */
-function isListable(item) {
+export function isListable(item) {
   if (item.status !== "ROUTED") return false;
   const effective = item.chosenDisposition || item.finalDisposition;
   if (effective !== "Resell") return false;

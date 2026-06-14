@@ -73,19 +73,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 icon: const Icon(Icons.notifications_outlined, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text('3',
-                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
-              ),
             ],
           ),
           const SizedBox(width: 8),
@@ -778,7 +765,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF8EF),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: amazonOrange.withOpacity(0.25)),
+                border: Border.all(color: amazonOrange.withValues(alpha: 0.25)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -983,9 +970,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.07),
+        color: c.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.withOpacity(0.25)),
+        border: Border.all(color: c.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

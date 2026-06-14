@@ -8,7 +8,7 @@ import 'views/login_view.dart';
 /// In-app notifications feed: purchase confirmations, reservation holds, and
 /// reservation-expiry notices. Backed by GET /notifications.
 class NotificationsTab extends StatefulWidget {
-  const NotificationsTab({Key? key}) : super(key: key);
+  const NotificationsTab({super.key});
 
   @override
   State<NotificationsTab> createState() => NotificationsTabState();

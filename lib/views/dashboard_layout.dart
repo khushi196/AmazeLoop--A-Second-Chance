@@ -154,7 +154,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                       }),
                       IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white70), onPressed: null),
                       const SizedBox(width: 16),
-                      const CircleAvatar(radius: 16, backgroundColor: Color(0xFFFF9900), child: Text('EV', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white))),
+                      const CircleAvatar(radius: 16, backgroundColor: Color(0xFFFF9900), child: Icon(Icons.person, size: 18, color: Colors.white)),
                     ],
                   ),
                 ),

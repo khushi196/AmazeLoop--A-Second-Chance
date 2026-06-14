@@ -115,7 +115,7 @@ function deriveIssues(conditionReason) {
  * the item rather than producing a new one. Coarse, category-keyed lookup —
  * good enough for the buyer card and clearly approximate.
  */
-function circularImpactKg(category) {
+export function circularImpactKg(category) {
   const c = (category || "").toLowerCase();
   if (c.includes("phone") || c.includes("mobile")) return 55;
   if (c.includes("laptop") || c.includes("computer")) return 320;
@@ -138,13 +138,13 @@ const REVERSE_HUB_CONSTANT_KM = 150;  // origin warehouse -> manufacturer/return
 const FREIGHT_CO2_KG_PER_KM = 0.12;   // ~kg CO2e per km for a small parcel by road
 
 /** Estimated reverse-shipping distance (km) avoided by reselling locally. */
-function reverseShippingAvoidedKm(distanceKm) {
+export function reverseShippingAvoidedKm(distanceKm) {
   const d = Number(distanceKm) || 0;
   return Math.round(d + REVERSE_HUB_CONSTANT_KM);
 }
 
 /** Estimated transport CO2e (kg) saved by avoiding that reverse leg. */
-function transportCo2SavedKg(distanceKm) {
+export function transportCo2SavedKg(distanceKm) {
   const km = reverseShippingAvoidedKm(distanceKm);
   return Math.round(km * FREIGHT_CO2_KG_PER_KM * 10) / 10;
 }

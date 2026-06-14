@@ -7,7 +7,7 @@ import 'ListingDetailScreen.dart';
 
 class MarketplaceTab extends StatefulWidget {
   final VoidCallback? onNotificationsTap;
-  const MarketplaceTab({Key? key, this.onNotificationsTap}) : super(key: key);
+  const MarketplaceTab({super.key, this.onNotificationsTap});
 
   @override
   State<MarketplaceTab> createState() => _MarketplaceTabState();
@@ -440,7 +440,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: amazonOrange.withOpacity(0.25),
+                    color: amazonOrange.withValues(alpha: 0.25),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -477,7 +477,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -506,7 +506,7 @@ class _MarketplaceTabState extends State<MarketplaceTab> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: amazonNavy.withOpacity(0.88),
+                      color: amazonNavy.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(

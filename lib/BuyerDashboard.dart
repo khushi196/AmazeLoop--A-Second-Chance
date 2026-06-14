@@ -11,7 +11,7 @@ import 'data/session.dart';
 /// Top-level shell for buyers and guest browsers. The Sell / Trade-in flow
 /// lives behind the entry screen, not in this dashboard.
 class BuyerDashboard extends StatefulWidget {
-  const BuyerDashboard({Key? key}) : super(key: key);
+  const BuyerDashboard({super.key});
 
   @override
   State<BuyerDashboard> createState() => _BuyerDashboardState();

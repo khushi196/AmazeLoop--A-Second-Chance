@@ -70,6 +70,24 @@ async function notify(userId, type, title, bodyText, evaluationId) {
   }
 }
 
+/**
+ * Pure predicate mirroring the BUY/RESERVE ConditionExpression so the atomic
+ * claim rule can be unit-tested. An item is claimable by [buyerUserId] when:
+ *   - it has no buyer (free), OR
+ *   - the buyer already holds it, OR
+ *   - a prior reservation has expired (reservationExpiresAt < now).
+ * It is NOT claimable while actively reserved or sold by another buyer.
+ * ISO-8601 UTC timestamps compare correctly as strings, exactly like DynamoDB.
+ */
+export function buyConditionSatisfied(item, buyerUserId, nowIso) {
+  if (!item || !item.buyerUserId) return true; // free
+  if (item.buyerUserId === buyerUserId) return true; // already ours
+  if (item.reservationExpiresAt && item.reservationExpiresAt < nowIso) {
+    return true; // a prior (any-buyer) reservation has expired → reclaimable
+  }
+  return false; // actively reserved or sold by someone else
+}
+
 export const handler = async (event) => {
   if (
     event?.requestContext?.http?.method === "OPTIONS" ||
@@ -219,14 +237,18 @@ export const handler = async (event) => {
           Key: { evaluationId },
           UpdateExpression:
             "SET buyerUserId = :b, purchaseStatus = :ps, purchaseTimestamp = :t REMOVE reservationExpiresAt ADD resaleCount :one",
-          // Succeed if the item is free, OR already reserved by this buyer.
+          // Atomic guard (mirrors RESERVE and buyConditionSatisfied()): the
+          // item is claimable only if it is free, already ours, or a prior
+          // reservation has expired. Crucially this does NOT allow buying an
+          // item that is actively RESERVED by another buyer — closing the
+          // read-then-write race the previous `purchaseStatus <> :sold` left open.
           ConditionExpression:
-            "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR purchaseStatus <> :sold",
+            "attribute_not_exists(buyerUserId) OR buyerUserId = :b OR reservationExpiresAt < :now",
           ExpressionAttributeValues: {
             ":b": buyerUserId,
             ":ps": "SOLD",
             ":t": nowIso,
-            ":sold": "SOLD",
+            ":now": nowIso,
             ":one": 1,
           },
         })

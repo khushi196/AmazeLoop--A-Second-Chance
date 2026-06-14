@@ -7,7 +7,7 @@ import 'ListingDetailScreen.dart';
 import 'views/login_view.dart';
 
 class PurchasesTab extends StatefulWidget {
-  const PurchasesTab({Key? key}) : super(key: key);
+  const PurchasesTab({super.key});
 
   @override
   State<PurchasesTab> createState() => PurchasesTabState();

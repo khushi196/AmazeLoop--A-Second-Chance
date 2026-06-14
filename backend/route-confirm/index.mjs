@@ -21,6 +21,11 @@ const bedrock = new BedrockRuntimeClient({ region: REGION });
 
 const VALID_DISPOSITIONS = ["Resell", "Refurbish", "Recycle", "ReturnToOrigin", "Donate"];
 
+/** True if [d] is an accepted final disposition. Exported for unit tests. */
+export function isValidDisposition(d) {
+  return VALID_DISPOSITIONS.includes(d);
+}
+
 function response(statusCode, body) {
   return {
     statusCode,
@@ -91,7 +96,7 @@ export const handler = async (event) => {
   if (!evaluationId || typeof evaluationId !== "string") {
     return response(400, { error: "evaluationId is required." });
   }
-  if (!VALID_DISPOSITIONS.includes(chosenDisposition)) {
+  if (!isValidDisposition(chosenDisposition)) {
     return response(400, {
       error:
         "chosenDisposition must be one of Resell, Refurbish, Recycle, ReturnToOrigin, Donate.",

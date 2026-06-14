@@ -32,8 +32,14 @@ class ListingsPage {
 
 /// Talks to the real AmazeLoop backend (API Gateway).
 class GradeRepository {
-  static const String _baseUrl =
-      'https://bu719hnik3.execute-api.ap-south-1.amazonaws.com';
+  /// API Gateway base URL. Overridable at build time without code changes:
+  ///   flutter run -d chrome --dart-define=AMAZELOOP_API_BASE_URL=https://API_ID.execute-api.REGION.amazonaws.com
+  /// Falls back to the current deployed demo backend when not provided.
+  /// Note: provide the URL WITHOUT a trailing slash.
+  static const String _baseUrl = String.fromEnvironment(
+    'AMAZELOOP_API_BASE_URL',
+    defaultValue: 'https://bu719hnik3.execute-api.ap-south-1.amazonaws.com',
+  );
 
   static const String _gradeUrl = '$_baseUrl/grade';
   static const String _aiGradeUrl = '$_baseUrl/ai-grade';

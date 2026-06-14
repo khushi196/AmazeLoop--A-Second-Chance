@@ -10,7 +10,7 @@ import 'views/login_view.dart';
 /// time-remaining indicator. Items not bought before expiry are released by
 /// the backend sweep and disappear from this list.
 class ReservedTab extends StatefulWidget {
-  const ReservedTab({Key? key}) : super(key: key);
+  const ReservedTab({super.key});
 
   @override
   State<ReservedTab> createState() => ReservedTabState();

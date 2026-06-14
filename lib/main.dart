@@ -51,7 +51,7 @@ class _AmazonLoopAppState extends State<AmazonLoopApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Amazon Loop',
+      title: 'AmazeLoop',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFEAEDED), 
