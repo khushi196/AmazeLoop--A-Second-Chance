@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
 import '../data/route_helpers.dart';
@@ -29,31 +30,33 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
       'title': 'Return to Origin',
       'desc': 'Send back to the originating warehouse / fulfilment centre.',
       'icon': Icons.assignment_return_outlined,
+      'bgColor': Color(0xFFE3F2FD),
+      'iconColor': Color(0xFF1976D2),
     },
     'Resell': {
-      'key': 'Resell',
       'title': 'Resell',
       'desc': 'Immediate listing on Amazon Renewed.',
       'icon': Icons.storefront,
+      'bgColor': Color(0xFFE8F5E9),
+      'iconColor': Color(0xFF388E3C),
     },
     'Refurbish': {
-      'key': 'Refurbish',
       'title': 'Refurbish',
       'desc': 'Minor repair at regional facility.',
       'icon': Icons.build_circle_outlined,
+      'bgColor': Color(0xFFFFF3E0),
+      'iconColor': Color(0xFFF57C00),
     },
     'Recycle': {
-      'key': 'Recycle',
       'title': 'Recycle',
       'desc': 'Responsible e-waste disposal.',
       'icon': Icons.recycling,
+      'bgColor': Color(0xFFE0F2F1),
+      'iconColor': Color(0xFF00897B),
     },
   };
 
   /// The route options visible to the current user, derived from role + item.
-  /// Customers always see Resell/Refurbish/Recycle. Warehouse operators get
-  /// ReturnToOrigin too when the item came from a customer return AND the
-  /// origin warehouse is reachable.
   List<Map<String, dynamic>> get _options {
     final e = widget.evaluation;
     final eligibility = deriveRouteEligibility(
@@ -87,10 +90,9 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
       if (!mounted) return;
       setState(() {
         _route = r;
-        _selected = r.finalDisposition; // pre-select the AI recommendation
+        _selected = r.finalDisposition;
         _loading = false;
       });
-      // mirror onto the evaluation object
       widget.evaluation!
         ..recommendedRoute = r.recommendedRoute
         ..finalDisposition = r.finalDisposition
@@ -118,13 +120,20 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
       if (!mounted) return;
       setState(() => _confirming = false);
       if (widget.onNavigate != null) {
-        widget.onNavigate!(HealthCardView(onNavigate: widget.onNavigate, evaluation: widget.evaluation, onFinishToHistory: widget.onFinishToHistory));
+        widget.onNavigate!(HealthCardView(
+          onNavigate: widget.onNavigate,
+          evaluation: widget.evaluation,
+          onFinishToHistory: widget.onFinishToHistory,
+        ));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red.shade700),
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
       );
     }
   }
@@ -132,150 +141,359 @@ class _RoutingDecisionViewState extends State<RoutingDecisionView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: const Color(0xFFEEF0F2),
       body: _loading
-          ? const Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                CircularProgressIndicator(color: Color(0xFFFF9900)),
-                SizedBox(height: 16),
-                Text('Finding the best next life...', style: TextStyle(fontWeight: FontWeight.bold)),
-              ]),
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: amazonOrange),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Finding the best next life...',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
             )
           : _error != null
-              ? Center(child: Text(_error!, style: TextStyle(color: Colors.red.shade700)))
+              ? Center(
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Colors.red.shade700),
+                  ),
+                )
               : _buildContent(),
     );
   }
 
   Widget _buildContent() {
     final r = _route!;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32.0),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00687A).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF00687A).withValues(alpha: 0.3)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.auto_awesome, size: 16, color: Color(0xFF00687A)),
-                  const SizedBox(width: 8),
-                  Text('AI RECOMMENDATION: ${r.finalDisposition.toUpperCase()}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00687A), letterSpacing: 1.2)),
-                ]),
-              ),
-              const SizedBox(height: 16),
-              Text('Best next life for this product: ${r.finalDisposition}',
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F1111), letterSpacing: -0.5)),
-              const SizedBox(height: 8),
-              Text(r.routeReason, style: TextStyle(fontSize: 16, color: Colors.grey.shade700, height: 1.5)),
-              if (r.nearestWarehouseId != null) ...[
-                const SizedBox(height: 8),
-                Row(children: [
-                  Icon(Icons.warehouse_outlined, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 6),
-                  Text('Nearest warehouse: ${r.nearestWarehouseId} • ${r.distanceKm ?? '—'} km',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                ]),
-              ],
-              const SizedBox(height: 32),
+    final options = _options;
 
-              // Option cards
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _options.map((o) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ─── AI Recommendation pill ───
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00687A).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF00687A).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.auto_awesome, size: 16, color: Color(0xFF00687A)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI RECOMMENDATION:  ${r.finalDisposition.toUpperCase()}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00687A),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ─── Heading ───
+                Text(
+                  'Best next life for this product: ${r.finalDisposition}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ─── Route reason ───
+                Text(
+                  r.routeReason,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    height: 1.5,
+                  ),
+                ),
+
+                // ─── Nearest warehouse (optional) ───
+                if (r.nearestWarehouseId != null) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 18, color: Colors.grey.shade600),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Nearest warehouse: ${r.nearestWarehouseId} (${r.distanceKm ?? '—'} km away)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 28),
+
+                // ─── Route option cards ───
+                ...options.map((o) {
                   final key = o['key'] as String;
                   final isSelected = _selected == key;
                   final isRecommended = r.finalDisposition == key;
-                  final locked = !_overrideMode; // can't change unless override mode
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: InkWell(
-                        onTap: locked && !isSelected ? null : () => setState(() => _selected = key),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFFF9900).withValues(alpha: 0.06) : Colors.white,
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade300,
-                              width: isSelected ? 2 : 1,
+                  final locked = !_overrideMode;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: locked && !isSelected
+                          ? null
+                          : () => setState(() => _selected = key),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? amazonOrange.withValues(alpha: 0.05)
+                              : Colors.white,
+                          border: Border.all(
+                            color: isSelected ? amazonOrange : Colors.grey.shade300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            // Icon circle
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: o['bgColor'] as Color,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                o['icon'] as IconData,
+                                color: o['iconColor'] as Color,
+                                size: 24,
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Icon(o['icon'] as IconData, color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade600),
-                                const Spacer(),
-                                if (isRecommended)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(color: const Color(0xFF00687A), borderRadius: BorderRadius.circular(4)),
-                                    child: const Text('AI PICK', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 16),
+
+                            // Title & description
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    o['title'] as String,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textPrimary,
+                                    ),
                                   ),
-                                Icon(isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                                    color: isSelected ? const Color(0xFFFF9900) : Colors.grey.shade400, size: 20),
-                              ]),
-                              const SizedBox(height: 12),
-                              Text(o['title'] as String, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F1111))),
-                              const SizedBox(height: 6),
-                              Text(o['desc'] as String, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    o['desc'] as String,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // AI PICK badge
+                            if (isRecommended) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00687A).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFF00687A).withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'AI PICK',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF00687A),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
                             ],
-                          ),
+
+                            // Radio button
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected ? amazonOrange : Colors.grey.shade400,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? Center(
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: const BoxDecoration(
+                                          color: amazonOrange,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
+                }),
 
-              Row(
-                children: [
-                  if (!_overrideMode)
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() => _overrideMode = true),
-                      icon: const Icon(Icons.edit, size: 18),
-                      label: const Text('Override recommendation'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                        foregroundColor: Colors.grey.shade800,
-                        side: BorderSide(color: Colors.grey.shade400),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.amber.shade300)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.amber.shade800),
+                // ─── Info note for warehouse items ───
+                if (_options.any((o) => o['key'] == 'ReturnToOrigin'))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
                         const SizedBox(width: 8),
-                        Text('Override mode — pick any option', style: TextStyle(fontSize: 13, color: Colors.amber.shade900)),
-                      ]),
+                        Text(
+                          'Warehouse return items may include Return to Origin when eligible.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        ),
+                      ],
                     ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _confirming ? null : _confirm,
-                    icon: _confirming
-                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.check_circle),
-                    label: Text(_confirming ? 'CONFIRMING...' : 'CONFIRM & CONTINUE', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20)),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Warehouse return items may include Return to Origin when eligible.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ],
+
+                // ─── Override recommendation button ───
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _overrideMode
+                        ? null
+                        : () => setState(() => _overrideMode = true),
+                    icon: Icon(
+                      Icons.tune,
+                      size: 18,
+                      color: _overrideMode ? Colors.grey.shade400 : textPrimary,
+                    ),
+                    label: Text(
+                      _overrideMode ? 'Override mode active' : 'Override recommendation',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _overrideMode ? Colors.grey.shade400 : textPrimary,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(
+                        color: _overrideMode ? Colors.grey.shade300 : Colors.grey.shade400,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ─── Confirm & Continue button ───
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _confirming ? null : _confirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: amazonOrange,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: amazonOrange.withValues(alpha: 0.6),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _confirming
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'CONFIRM & CONTINUE',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

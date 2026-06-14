@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/report_generator.dart';
 import 'submit_item_view.dart';
@@ -14,7 +15,6 @@ class HealthCardView extends StatelessWidget {
     this.onFinishToHistory,
   });
 
-  /// Gets the hero photo URL using bestPhotoIndex, falling back to the first photo.
   String? _heroPhotoUrl(EvaluationInput? e) {
     if (e == null || e.photoUrls == null || e.photoUrls!.isEmpty) return null;
     final idx = e.bestPhotoIndex ?? 0;
@@ -25,32 +25,66 @@ class HealthCardView extends StatelessWidget {
   String _money(num? v, String currency) {
     if (v == null || v == 0) return 'N/A — Recycle';
     final symbol = currency == 'INR' ? '₹' : '$currency ';
-    return '$symbol${v.toStringAsFixed(0)}';
+    return '$symbol${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
   }
 
-  List<String> _nextSteps(String? disposition, String? warehouse) {
-    final wh = warehouse ?? 'nearest warehouse';
+  Color _getConditionColor(String? condition) {
+    switch (condition?.toLowerCase()) {
+      case 'excellent':
+      case 'good':
+        return const Color(0xFF00875A);
+      case 'fair':
+        return amazonOrange;
+      case 'poor':
+        return Colors.red.shade600;
+      default:
+        return const Color(0xFF00687A);
+    }
+  }
+
+  List<String> _nextSteps(String? disposition) {
     switch (disposition) {
       case 'Resell':
         return [
-          'Generate and attach the digital health passport',
-          'List on Amazon Renewed (open box)',
-          'Ship from $wh to fulfilment',
+          'Item will be listed on AmazeLoop Marketplace.',
+          'Quality verification and final listing.',
+          'Ready for buyer purchase and shipment.',
         ];
       case 'Refurbish':
         return [
-          'Route to $wh refurbishment line',
-          'Perform minor repair & quality check',
-          'Re-grade and list once restored',
+          'Route to refurbishment facility.',
+          'Perform repair & quality check.',
+          'Re-grade and list once restored.',
         ];
       case 'Recycle':
         return [
-          'Send to $wh e-waste partner',
-          'Harvest reusable parts',
-          'Issue responsible-disposal certificate',
+          'Send to e-waste partner.',
+          'Harvest reusable parts.',
+          'Issue responsible-disposal certificate.',
+        ];
+      case 'ReturnToOrigin':
+        return [
+          'Route back to origin warehouse.',
+          'Inventory reconciliation.',
+          'Ready for restocking or processing.',
         ];
       default:
-        return ['Proceed with the selected disposition'];
+        return ['Proceed with the selected disposition.'];
+    }
+  }
+
+  String _getDispositionDescription(String? disposition) {
+    switch (disposition) {
+      case 'Resell':
+        return 'Immediate listing on AmazeLoop Marketplace.';
+      case 'Refurbish':
+        return 'Minor repair at regional facility.';
+      case 'Recycle':
+        return 'Responsible e-waste disposal.';
+      case 'ReturnToOrigin':
+        return 'Return to originating warehouse.';
+      default:
+        return 'Processing your item.';
     }
   }
 
@@ -60,164 +94,248 @@ class HealthCardView extends StatelessWidget {
     final currency = e?.currency ?? 'INR';
     final disposition = e?.chosenDisposition ?? e?.finalDisposition ?? '—';
     final isOverride = e?.isOverride == true;
+    final conditionColor = _getConditionColor(e?.condition);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
-        child: Align(
-          alignment: Alignment.topCenter,
+      backgroundColor: const Color(0xFFEEF0F2),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+            constraints: const BoxConstraints(maxWidth: 700),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ─── Header ───
                 const Text(
                   'AmazeLoop HealthCard',
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F1111),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary,
                     letterSpacing: -0.5,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Final summary for this product. Attach this card to guarantee authenticity and condition.',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    height: 1.5,
+                  ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-                // Passport card
+                // ─── Main Product Card ───
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300, width: 2),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Column(
                     children: [
+                      // Orange top bar
                       Container(
-                        height: 8,
+                        height: 6,
                         decoration: const BoxDecoration(
-                          color: Color(0xFFFF9900),
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(10),
-                          ),
+                          color: amazonOrange,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                         ),
                       ),
-
-                      // Hero photo
-                      if (_heroPhotoUrl(e) != null)
-                        Container(
-                          width: double.infinity,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            image: DecorationImage(
-                              image: NetworkImage(_heroPhotoUrl(e)!),
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-
                       Padding(
-                        padding: const EdgeInsets.all(32.0),
+                        padding: const EdgeInsets.all(24),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Product info row: Image + Details
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Product image
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
+                                  width: 160,
+                                  height: 160,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF00687A),
-                                    borderRadius: BorderRadius.circular(4),
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: _heroPhotoUrl(e) != null
+                                        ? DecorationImage(
+                                            image: NetworkImage(_heroPhotoUrl(e)!),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
                                   ),
-                                  child: Text(
-                                    (e?.condition ?? 'N/A').toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
+                                  child: _heroPhotoUrl(e) == null
+                                      ? Icon(Icons.image, size: 48, color: Colors.grey.shade400)
+                                      : null,
                                 ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  'ID: ${e?.evaluationId ?? '—'}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              e?.productName ?? 'Graded Item',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F1111),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              e?.category ?? '',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const Divider(),
-                            const SizedBox(height: 16),
+                                const SizedBox(width: 24),
 
-                            // Key metrics
-                            Row(
-                              children: [
+                                // Product details
                                 Expanded(
-                                  child: _metric(
-                                    'Condition',
-                                    e?.condition ?? '—',
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Condition badge
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: conditionColor,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          (e?.condition ?? 'N/A').toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+
+                                      // Product ID
+                                      Text(
+                                        'Product ID: ${e?.evaluationId ?? '—'}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+
+                                      // Product name
+                                      Text(
+                                        e?.productName ?? 'Graded Item',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+
+                                      // Category
+                                      Text(
+                                        'Category: ${e?.category ?? '—'}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                Expanded(
-                                  child: _metric(
-                                    'Est. resale value',
-                                    _money(
-                                      e?.estimatedResaleValue ??
-                                          e?.normalizedPrice,
-                                      currency,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _metric('Disposition', disposition),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 24),
+
+                            // ─── Metrics row ───
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(color: Colors.grey.shade200),
+                                  bottom: BorderSide(color: Colors.grey.shade200),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildMetricItem(
+                                      icon: Icons.verified_outlined,
+                                      iconColor: conditionColor,
+                                      label: 'Condition',
+                                      value: (e?.condition ?? '—').toUpperCase(),
+                                      valueColor: conditionColor,
+                                      sublabel: 'AI-graded',
+                                    ),
+                                  ),
+                                  Container(width: 1, height: 60, color: Colors.grey.shade200),
+                                  Expanded(
+                                    child: _buildMetricItem(
+                                      icon: Icons.sell_outlined,
+                                      iconColor: amazonOrange,
+                                      label: 'Est. resale value',
+                                      value: _money(e?.estimatedResaleValue ?? e?.normalizedPrice, currency),
+                                      valueColor: amazonOrange,
+                                      sublabel: 'Normalized value',
+                                    ),
+                                  ),
+                                  Container(width: 1, height: 60, color: Colors.grey.shade200),
+                                  Expanded(
+                                    child: _buildMetricItem(
+                                      icon: Icons.local_shipping_outlined,
+                                      iconColor: amazonOrange,
+                                      label: 'Disposition',
+                                      value: disposition.toUpperCase(),
+                                      valueColor: amazonOrange,
+                                      sublabel: 'Recommended route',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // ─── Condition reason ───
                             if ((e?.conditionReason ?? '').isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              Text(
-                                e!.conditionReason!,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade700,
-                                  fontStyle: FontStyle.italic,
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: amazonNavy.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.description_outlined,
+                                        size: 18,
+                                        color: amazonNavy,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Condition reason:',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            e!.conditionReason!,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -227,93 +345,158 @@ class HealthCardView extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                // Chosen disposition + next steps
+                // ─── Final Disposition Card ───
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header row
                       Row(
                         children: [
-                          const Icon(Icons.route, color: Color(0xFFFF9900)),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Final disposition: $disposition',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F1111),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: amazonOrange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.verified_outlined,
+                              color: amazonOrange,
+                              size: 22,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          if (isOverride)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'OVERRIDDEN',
-                                style: TextStyle(
-                                  color: Colors.amber.shade900,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Final disposition: ',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      disposition,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: amazonOrange,
+                                      ),
+                                    ),
+                                    if (isOverride) ...[
+                                      const SizedBox(width: 10),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.amber.shade300),
+                                        ),
+                                        child: Text(
+                                          'OVERRIDDEN',
+                                          style: TextStyle(
+                                            color: Colors.amber.shade800,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _getDispositionDescription(disposition),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
+
+                      // Next steps
                       const Text(
                         'Next steps',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F1111),
-                          letterSpacing: 0.5,
+                          color: textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      ..._nextSteps(
-                        disposition,
-                        e?.nearestWarehouseId,
-                      ).asMap().entries.map(
+                      const SizedBox(height: 16),
+                      ..._nextSteps(disposition).asMap().entries.map(
                         (entry) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                radius: 10,
-                                backgroundColor: const Color(0xFFFF9900),
-                                child: Text(
-                                  '${entry.key + 1}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                              // Step number with connecting line
+                              Column(
+                                children: [
+                                  Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: amazonOrange.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: amazonOrange, width: 1.5),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${entry.key + 1}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: amazonOrange,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (entry.key < _nextSteps(disposition).length - 1)
+                                    Container(
+                                      width: 2,
+                                      height: 16,
+                                      color: amazonOrange.withValues(alpha: 0.3),
+                                    ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 14),
                               Expanded(
-                                child: Text(
-                                  entry.value,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF0F1111),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    entry.value,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade700,
+                                      height: 1.4,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -324,64 +507,73 @@ class HealthCardView extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
+                // ─── Action buttons ───
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: e == null
-                          ? null
-                          : () async {
-                              try {
-                                await ReportGenerator.downloadReport(e);
-                              } catch (err) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Could not generate report: $err',
-                                      ),
-                                    ),
-                                  );
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: e == null
+                            ? null
+                            : () async {
+                                try {
+                                  await ReportGenerator.downloadReport(e);
+                                } catch (err) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Could not generate report: $err')),
+                                    );
+                                  }
                                 }
-                              }
-                            },
-                      icon: const Icon(Icons.download),
-                      label: const Text(
-                        'DOWNLOAD REPORT',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 20,
+                              },
+                        icon: const Icon(Icons.download_outlined, size: 18),
+                        label: const Text(
+                          'DOWNLOAD REPORT',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        foregroundColor: const Color(0xFF0F1111),
-                        side: BorderSide(color: Colors.grey.shade300, width: 2),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          foregroundColor: textPrimary,
+                          side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        if (onFinishToHistory != null) {
-                          onFinishToHistory!();
-                        } else if (onNavigate != null) {
-                          onNavigate!(SubmitItemView(onNavigate: onNavigate));
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle),
-                      label: const Text(
-                        'CONFIRM & ROUTE',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 20,
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (onFinishToHistory != null) {
+                            onFinishToHistory!();
+                          } else if (onNavigate != null) {
+                            onNavigate!(SubmitItemView(onNavigate: onNavigate));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: amazonOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                        backgroundColor: const Color(0xFFFF9900),
-                        foregroundColor: Colors.white,
+                        child: const Text(
+                          'CONFIRM & ROUTE',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -394,25 +586,45 @@ class HealthCardView extends StatelessWidget {
     );
   }
 
-  Widget _metric(String label, String value) {
+  Widget _buildMetricItem({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color valueColor,
+    required String sublabel,
+  }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: iconColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F1111),
+            color: valueColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          sublabel,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade500,
           ),
         ),
       ],

@@ -24,7 +24,6 @@ class NotificationsTabState extends State<NotificationsTab> {
     _maybeLoad();
   }
 
-  /// Public so BuyerDashboard can refresh when this tab becomes visible.
   void reload() {
     if (!mounted) return;
     setState(_maybeLoad);
@@ -46,32 +45,34 @@ class NotificationsTabState extends State<NotificationsTab> {
   IconData _iconFor(String type) {
     switch (type) {
       case 'PURCHASE':
-        return Icons.check_circle;
+        return Icons.shopping_cart_checkout;
       case 'RESERVATION':
         return Icons.bookmark_added;
       case 'RESERVATION_EXPIRED':
-        return Icons.timer_off;
+        return Icons.schedule;
       case 'ITEM_SOLD':
-        return Icons.sell;
+        return Icons.check_circle_outline;
       case 'ITEM_RESERVED':
-        return Icons.bookmark_outline;
+        return Icons.person_outline;
       case 'LISTING_RELISTED':
         return Icons.refresh;
       default:
-        return Icons.notifications;
+        return Icons.notifications_outlined;
     }
   }
 
-  Color _colorFor(String type) {
+  Color _bgColorFor(String type) {
     switch (type) {
       case 'PURCHASE':
+        return const Color(0xFF00875A); // Green
       case 'ITEM_SOLD':
-        return Colors.green.shade700;
+        return const Color(0xFF00875A); // Green
       case 'RESERVATION':
+        return amazonOrange;
       case 'ITEM_RESERVED':
         return amazonOrange;
       case 'RESERVATION_EXPIRED':
-        return Colors.red.shade700;
+        return Colors.red.shade500;
       case 'LISTING_RELISTED':
         return amazonNavy;
       default:
@@ -91,11 +92,18 @@ class NotificationsTabState extends State<NotificationsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: surfaceBg,
+      backgroundColor: const Color(0xFFEEF0F2),
       appBar: AppBar(
         backgroundColor: amazonNavy,
         elevation: 0,
-        title: const Text('Notifications', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Notifications',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         automaticallyImplyLeading: false,
         actions: [
           if (Session.isSignedIn)
@@ -117,23 +125,33 @@ class NotificationsTabState extends State<NotificationsTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.notifications_off_outlined, size: 56, color: Colors.grey[400]),
-            const SizedBox(height: 16),
+            Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 20),
             const Text(
               'Sign in to see notifications',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: textPrimary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+            Text(
+              'Purchase and reservation updates will show up here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: const Icon(Icons.login),
               label: const Text('Sign in'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: amazonOrange,
-                foregroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () async {
                 await Navigator.push(
@@ -168,70 +186,108 @@ class NotificationsTabState extends State<NotificationsTab> {
           if (notes.isEmpty) {
             return _buildEmpty();
           }
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: notes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) => _buildCard(notes[i]),
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ...notes.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final n = entry.value;
+                        final isLast = index == notes.length - 1;
+                        return _buildNotificationRow(n, isLast);
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildCard(AppNotification n) {
-    final color = _colorFor(n.type);
+  Widget _buildNotificationRow(AppNotification n, bool isLast) {
+    final bgColor = _bgColorFor(n.type);
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        border: isLast
+            ? null
+            : Border(
+                bottom: BorderSide(color: Colors.grey.shade200),
+              ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Icon circle
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: bgColor,
               shape: BoxShape.circle,
             ),
-            child: Icon(_iconFor(n.type), color: color, size: 20),
+            child: Icon(
+              _iconFor(n.type),
+              color: Colors.white,
+              size: 22,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
+
+          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        n.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: textPrimary,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      _ago(n.createdAt),
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                    ),
-                  ],
+                Text(
+                  n.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   n.body,
                   style: TextStyle(
-                    color: Colors.grey.shade800,
-                    fontSize: 13,
-                    height: 1.35,
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Time ago
+          Text(
+            _ago(n.createdAt),
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
             ),
           ),
         ],
@@ -244,25 +300,25 @@ class NotificationsTabState extends State<NotificationsTab> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.notifications_none, size: 56, color: Colors.grey[400]),
-              const SizedBox(height: 16),
+              Icon(Icons.notifications_none, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 20),
               const Text(
                 "You're all caught up",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: textPrimary,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              const SizedBox(height: 10),
+              Text(
                 'Purchase and reservation updates will show up here.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
             ],
           ),
@@ -276,34 +332,38 @@ class NotificationsTabState extends State<NotificationsTab> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud_off, size: 56, color: Colors.grey[400]),
-              const SizedBox(height: 16),
+              Icon(Icons.cloud_off, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 20),
               const Text(
                 "Couldn't load notifications",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: textPrimary,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 message.replaceFirst('Exception: ', ''),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _refresh,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Try again'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: amazonOrange,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ],

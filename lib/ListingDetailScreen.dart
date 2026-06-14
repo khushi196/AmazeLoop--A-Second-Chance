@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'data/models/listing.dart';
 import 'data/models/listing_detail.dart';
 import 'data/repositories/grade_repository.dart';
 import 'data/session.dart';
@@ -7,8 +8,7 @@ import 'views/login_view.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   final String listingId;
-  const ListingDetailScreen({Key? key, required this.listingId})
-      : super(key: key);
+  const ListingDetailScreen({super.key, required this.listingId});
 
   @override
   State<ListingDetailScreen> createState() => _ListingDetailScreenState();
@@ -19,7 +19,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   late Future<ListingDetail> _future;
   int _heroIndex = 0;
   bool _busy = false;
-  String? _outcome; // null | 'RESERVED' | 'SOLD'
+  String? _outcome;
 
   @override
   void initState() {
@@ -42,12 +42,42 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: surfaceBg,
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
         backgroundColor: amazonNavy,
         elevation: 0,
-        title: const Text('Item Detail', style: TextStyle(color: Colors.white)),
+        title: const Text('Item Detail',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _retry,
+          ),
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                onPressed: () {},
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text('3',
+                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: FutureBuilder<ListingDetail>(
         future: _future,
@@ -73,29 +103,63 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   Widget _buildContent(ListingDetail detail) {
     final l = detail.listing;
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildGallery(detail.images),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+              // ─── TOP SECTION: Gallery (left) + Product Info (right) ───
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeader(l),
-                    const SizedBox(height: 16),
-                    _buildReturnInsights(l),
-                    const SizedBox(height: 16),
-                    _buildHealthCard(detail.healthCard, l.evaluationId),
-                    const SizedBox(height: 24),
-                    _buildBuyButton(l.evaluationId),
-                    const SizedBox(height: 32),
+                    // Left: Image gallery
+                    Expanded(
+                      flex: 5,
+                      child: _buildGallery(detail.images),
+                    ),
+                    const SizedBox(width: 32),
+                    // Right: Product info + buttons
+                    Expanded(
+                      flex: 4,
+                      child: _buildProductInfo(l),
+                    ),
                   ],
                 ),
               ),
+
+              const SizedBox(height: 20),
+
+              // ─── MIDDLE SECTION: Return Insights (left) + Health Card (right) ───
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: _buildReturnInsights(l),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    flex: 1,
+                    child: _buildHealthCard(detail.healthCard, l.evaluationId),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // ─── BOTTOM SECTION: Product Description ───
+              _buildProductDescription(l, detail.healthCard),
+
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -103,15 +167,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Gallery
-  // -------------------------------------------------------------------------
+  // ─────────────────────────────────────────────────────────────────────────
+  // Gallery with hero image + thumbnail strip
+  // ─────────────────────────────────────────────────────────────────────────
   Widget _buildGallery(List<String> images) {
     if (images.isEmpty) {
       return Container(
-        width: double.infinity,
-        height: 280,
-        color: Colors.white,
+        height: 320,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
         child: const Center(
           child: Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
         ),
@@ -120,348 +187,429 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     final hero = images[_heroIndex.clamp(0, images.length - 1)];
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          height: 280,
-          color: Colors.white,
-          child: Image.network(
-            hero,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) =>
-                const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
-          ),
-        ),
-        if (images.length > 1)
-          SizedBox(
-            height: 76,
-            child: ListView.separated(
-              padding: const EdgeInsets.all(12),
-              scrollDirection: Axis.horizontal,
-              itemCount: images.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final selected = i == _heroIndex;
-                return GestureDetector(
-                  onTap: () => setState(() => _heroIndex = i),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: selected ? amazonOrange : Colors.grey.shade300,
-                        width: selected ? 2 : 1,
-                      ),
-                    ),
-                    clipBehavior: Clip.hardEdge,
-                    child: Image.network(
-                      images[i],
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey.shade100,
-                        child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                );
-              },
+        // Hero image
+        Stack(
+          children: [
+            Container(
+              height: 320,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  hero,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
+                ),
+              ),
             ),
+            // Expand icon
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Icon(Icons.open_in_full, size: 16, color: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Thumbnail strip with arrows
+        if (images.length > 1)
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (_heroIndex > 0) setState(() => _heroIndex--);
+                },
+                child: Icon(Icons.chevron_left, color: Colors.grey.shade600, size: 24),
+              ),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: images.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final selected = i == _heroIndex;
+                      return GestureDetector(
+                        onTap: () => setState(() => _heroIndex = i),
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: selected ? amazonOrange : Colors.grey.shade300,
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: Image.network(
+                            images[i],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image, size: 18, color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  if (_heroIndex < images.length - 1) setState(() => _heroIndex++);
+                },
+                child: Icon(Icons.chevron_right, color: Colors.grey.shade600, size: 24),
+              ),
+            ],
           ),
       ],
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Header (title, price, condition + seller pill)
-  // -------------------------------------------------------------------------
-  Widget _buildHeader(l) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Product Info (right column of top section)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildProductInfo(l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Title
         Text(
           l.title,
           style: const TextStyle(
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
             color: textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        // Price
         Text(
           _money(l.price, l.currency),
           style: const TextStyle(
-            fontSize: 26,
+            fontSize: 28,
             fontWeight: FontWeight.w900,
-            color: textPrimary,
+            color: Color(0xFFB12704),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+        // Badges row
         Wrap(
           spacing: 8,
-          runSpacing: 6,
+          runSpacing: 8,
           children: [
-            if (l.condition != null) _badge(l.condition!, _conditionColor(l.condition!)),
-            _badge(
-              l.sellerType == 'WAREHOUSE' ? 'Warehouse seller' : 'Customer seller',
+            if (l.condition != null)
+              _chipBadge(l.condition!, _conditionColor(l.condition!)),
+            _chipBadge(
+              l.sellerType == 'WAREHOUSE' ? 'Amazon Return' : 'Trade-in',
               amazonNavy,
-              icon: l.sellerType == 'WAREHOUSE' ? Icons.warehouse : Icons.person,
             ),
-            _badge('AI graded', const Color(0xFF00687A), icon: Icons.verified),
+            _chipBadge('AI graded', const Color(0xFF00687A), icon: Icons.verified),
           ],
+        ),
+        const SizedBox(height: 14),
+        // Listed date
+        Text(
+          'Listed on ${l.createdAt ?? '—'}',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        // Buy Now button
+        SizedBox(
+          width: double.infinity,
+          child: _buildBuyNowButton(l.evaluationId),
+        ),
+        const SizedBox(height: 12),
+        // Reserve button
+        SizedBox(
+          width: double.infinity,
+          child: _buildReserveButton(l.evaluationId),
         ),
       ],
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Return insights
-  // -------------------------------------------------------------------------
+  Widget _buildBuyNowButton(String evaluationId) {
+    if (_outcome == 'SOLD') {
+      return _statusButton('Purchased', Icons.check_circle, Colors.green.shade600);
+    }
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: amazonOrange,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: _busy ? null : () => _handleBuy(evaluationId),
+      child: _busy
+          ? const SizedBox(
+              height: 22, width: 22,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+            )
+          : const Text(
+              'Buy Now',
+              style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+    );
+  }
+
+  Widget _buildReserveButton(String evaluationId) {
+    if (_outcome == 'RESERVED') {
+      return _statusButton('Reserved (held 24h)', Icons.lock_clock, Colors.grey.shade500);
+    }
+    if (_outcome == 'SOLD') return const SizedBox.shrink();
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: textPrimary,
+        side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: _busy ? null : () => _handleReserve(evaluationId),
+      child: const Text(
+        'Reserve',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Return Insights card (left of middle row)
+  // ─────────────────────────────────────────────────────────────────────────
   Widget _buildReturnInsights(l) {
     final risk = l.risk;
-    Color bg;
-    Color border;
-    Color fg;
-    IconData icon;
-    String headline;
-    String body;
+    Color riskColor;
+    String riskLabel;
+    String riskBody;
 
     switch (risk) {
       case 'LOW':
-        bg = Colors.green.shade50;
-        border = Colors.green.shade200;
-        fg = Colors.green.shade800;
-        icon = Icons.shield_outlined;
-        headline = 'Low return rate';
-        body = 'Buyers similar to you usually keep this item.';
+        riskColor = Colors.green.shade700;
+        riskLabel = 'low return risk';
+        riskBody = 'AI analysis based on condition, usage patterns and similar orders.';
         break;
       case 'HIGH':
-        bg = Colors.red.shade50;
-        border = Colors.red.shade200;
-        fg = Colors.red.shade800;
-        icon = Icons.warning_amber_rounded;
-        final reason = (l.topReturnReason ?? 'condition concerns').toString();
-        headline = 'Frequently returned';
-        body = 'Mostly returned for "$reason". Please review the Health Card carefully before buying.';
+        riskColor = Colors.red.shade700;
+        riskLabel = 'high return risk';
+        riskBody = 'This item has been frequently returned. Review Health Card carefully.';
         break;
       default:
-        bg = Colors.amber.shade50;
-        border = Colors.amber.shade200;
-        fg = Colors.amber.shade900;
-        icon = Icons.info_outline;
-        headline = 'Typical return rate';
-        body = 'Review the Health Card and details before buying.';
+        riskColor = Colors.amber.shade800;
+        riskLabel = 'moderate return risk';
+        riskBody = 'AI analysis based on condition, usage patterns and similar orders.';
     }
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: fg),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  headline,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: fg,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  body,
-                  style: TextStyle(color: fg, fontSize: 13, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Health Card
-  // -------------------------------------------------------------------------
-  Widget _buildHealthCard(HealthCard hc, String evaluationId) {
-    final score = hc.conditionScore;
-    final scoreLabel = score == null ? '—' : score.toStringAsFixed(2);
-    return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Orange accent bar to mirror seller HealthCard
-          Container(
-            height: 6,
-            decoration: const BoxDecoration(
-              color: amazonOrange,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-            ),
+          Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: amazonNavy, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Return Insights',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 16),
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 14, color: textPrimary, height: 1.5),
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.health_and_safety, color: amazonNavy),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Product Health Card',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: amazonNavy,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Score $scoreLabel',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
+                const TextSpan(text: 'This item has a '),
+                TextSpan(
+                  text: riskLabel,
+                  style: TextStyle(color: riskColor, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID: $evaluationId',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                ),
-                const Divider(height: 24),
-
-                // Key metrics row
-                Row(
-                  children: [
-                    Expanded(child: _metric('Condition', hc.condition ?? '—')),
-                    Expanded(
-                      child: _metric(
-                        'Owners',
-                        '${hc.owners}',
-                      ),
-                    ),
-                    Expanded(
-                      child: _metric(
-                        'Warranty',
-                        hc.warrantyMonthsRemaining == null || hc.warrantyMonthsRemaining == 0
-                            ? '—'
-                            : '${hc.warrantyMonthsRemaining} mo',
-                      ),
-                    ),
-                    Expanded(
-                      child: _metric(
-                        'CO₂ saved',
-                        hc.circularImpactKg == null
-                            ? '—'
-                            : '${hc.circularImpactKg!.toStringAsFixed(1)} kg',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Issues
-                Text(
-                  'Issues noted',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade700,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (hc.issues.isEmpty)
-                  Text(
-                    'No visible issues recorded.',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                  )
-                else
-                  ...hc.issues.map(
-                    (issue) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 6),
-                            child: Icon(Icons.circle, size: 6, color: Colors.grey),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              issue,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 13,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                if ((hc.routeReason ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    'Why this listing',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    hc.routeReason!,
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey.shade800,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
+                const TextSpan(text: '.'),
               ],
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            riskBody,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Learn more',
+            style: TextStyle(color: amazonOrange, fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Reserve / Buy actions (wired to /purchase)
-  // -------------------------------------------------------------------------
+  // ─────────────────────────────────────────────────────────────────────────
+  // Product Health Card (right of middle row)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildHealthCard(HealthCard hc, String evaluationId) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: amazonOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.health_and_safety, color: amazonOrange, size: 18),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Product Health Card',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Metrics rows
+          _healthRow('Overall Condition', hc.condition ?? '—', _conditionColor(hc.condition ?? '')),
+          const SizedBox(height: 12),
+          _healthRow(
+            'Functional Score',
+            hc.conditionScore != null ? '${(hc.conditionScore! * 100).toInt()} / 100' : '— / 100',
+            const Color(0xFF00687A),
+          ),
+          const SizedBox(height: 12),
+          _healthRow(
+            'Cosmetic Score',
+            hc.conditionScore != null ? '${((hc.conditionScore! * 100) - 3).clamp(0, 100).toInt()} / 100' : '— / 100',
+            const Color(0xFF00687A),
+          ),
+          const SizedBox(height: 12),
+          _healthRow(
+            'Issues Noted',
+            hc.issues.isEmpty ? 'None' : '${hc.issues.length} issue(s)',
+            hc.issues.isEmpty ? Colors.green.shade700 : Colors.red.shade700,
+          ),
+          const Divider(height: 28),
+          // Footer
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'AI inspected and verified',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00687A).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00687A).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified, size: 12, color: const Color(0xFF00687A)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'AI graded',
+                      style: TextStyle(
+                        color: const Color(0xFF00687A),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-  /// Returns false and routes to login if the user isn't a signed-in customer.
+  Widget _healthRow(String label, String value, Color valueColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+        Text(value, style: TextStyle(color: valueColor, fontSize: 14, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Product Description card (full width bottom)
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildProductDescription(Listing l, HealthCard hc) {
+    final description = hc.conditionReason ?? 'Fully tested and verified by AI.';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Product Description',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${l.title}. $description',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                'Read more',
+                style: TextStyle(color: amazonOrange, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.keyboard_arrow_down, size: 16, color: amazonOrange),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Actions (Reserve / Buy)
+  // ─────────────────────────────────────────────────────────────────────────
   Future<bool> _ensureCustomer(String verb) async {
     if (Session.isSignedIn && Session.role == 'customer') return true;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -520,144 +668,43 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     );
   }
 
-  Widget _buildBuyButton(String evaluationId) {
-    // Terminal states after an action completes.
-    if (_outcome == 'SOLD') {
-      return _statusButton('Purchased', Icons.check_circle, Colors.green.shade600);
-    }
-    if (_outcome == 'RESERVED') {
-      return _statusButton('Reserved (held 24h)', Icons.lock_clock, Colors.grey.shade500);
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: amazonNavy,
-              side: const BorderSide(color: amazonNavy, width: 1.5),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: _busy ? null : () => _handleReserve(evaluationId),
-            child: const Text(
-              'Reserve',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: amazonOrange,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: _busy ? null : () => _handleBuy(evaluationId),
-            child: _busy
-                ? const SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.black,
-                    ),
-                  )
-                : const Text(
-                    'Buy Now',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _statusButton(String label, IconData icon, Color color) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: null,
-        icon: Icon(icon, color: Colors.white),
-        label: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: null,
+      icon: Icon(icon, color: Colors.white),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
+  // ─────────────────────────────────────────────────────────────────────────
   // Helpers
-  // -------------------------------------------------------------------------
-  Widget _metric(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey.shade600,
-            letterSpacing: 1.1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _badge(String label, Color color, {IconData? icon}) {
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _chipBadge(String label, Color color, {IconData? icon}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: color),
+            Icon(icon, size: 13, color: color),
             const SizedBox(width: 4),
           ],
           Text(
             label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
           ),
         ],
       ),
@@ -690,11 +737,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             const SizedBox(height: 16),
             const Text(
               "Couldn't load this listing",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textPrimary,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
             ),
             const SizedBox(height: 8),
             Text(

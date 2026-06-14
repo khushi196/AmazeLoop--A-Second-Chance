@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import '../constants.dart';
 import '../data/models/evaluation_input.dart';
 import '../data/repositories/grade_repository.dart';
 import 'grading_result_view.dart';
@@ -71,30 +72,23 @@ class _SubmitItemViewState extends State<SubmitItemView> {
     setState(() => _isGrading = true);
 
     try {
-      // 1. Upload all selected photos to S3 in parallel and collect their URLs.
-      //    We force-encode every image to JPEG before uploading because:
-      //    - Browsers (Chrome) often pick AVIF/HEIC from the gallery.
-      //    - Amazon Bedrock Nova only accepts jpeg, png, webp, gif.
-      //    The image package decodes any format and re-encodes to JPEG.
       final List<String> photoUrls = await Future.wait(
         List.generate(_selectedImages.length, (i) async {
           final xfile = _selectedImages[i];
           final rawBytes = await xfile.readAsBytes();
 
-          // Decode → re-encode as JPEG (lossless path if already JPEG/PNG).
           Uint8List uploadBytes;
           try {
             final decoded = img.decodeImage(rawBytes);
             if (decoded != null) {
               uploadBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 90));
             } else {
-              uploadBytes = rawBytes; // fallback: send as-is
+              uploadBytes = rawBytes;
             }
           } catch (_) {
-            uploadBytes = rawBytes; // decode failure: send as-is
+            uploadBytes = rawBytes;
           }
 
-          // Always tell S3 + Bedrock it's JPEG so the content-type matches.
           return _gradeRepository.uploadPhoto(
             bytes: uploadBytes,
             fileName: 'photo_$i.jpg',
@@ -103,7 +97,6 @@ class _SubmitItemViewState extends State<SubmitItemView> {
         }),
       );
 
-      // 2. Submit for price/order grading -> creates the Evaluation record
       final EvaluationInput result = await _gradeRepository.gradeItem(
         productName: _productNameController.text.trim(),
         category: _selectedCategory!,
@@ -113,7 +106,6 @@ class _SubmitItemViewState extends State<SubmitItemView> {
         photoUrls: photoUrls,
       );
 
-      // 3. Run AI vision grading (Rekognition) on the uploaded photos
       if (result.evaluationId != null) {
         try {
           final ai = await _gradeRepository.aiGrade(result.evaluationId!);
@@ -123,7 +115,6 @@ class _SubmitItemViewState extends State<SubmitItemView> {
           result.bestPhotoIndex = ai.bestPhotoIndex;
           result.photoUrls = photoUrls;
         } catch (e) {
-          // AI grading is best-effort; proceed with price data if it fails.
           result.photoUrls = photoUrls;
           debugPrint('AI grading failed: $e');
         }
@@ -154,74 +145,79 @@ class _SubmitItemViewState extends State<SubmitItemView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
-        child: Align(
-          alignment: Alignment.topCenter,
+      backgroundColor: const Color(0xFFEEF0F2),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
+            constraints: const BoxConstraints(maxWidth: 900),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ─── Header ───
                 const Text(
-                  'Give this product a second life',
+                  'Grade Item',
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F1111),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary,
                     letterSpacing: -0.5,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter the product details and upload condition photos to generate an accurate AI-driven grading assessment.',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                  'Enter the product details and upload clear photos of its condition.\nOur AI will evaluate and suggest the best next step.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    height: 1.5,
+                  ),
                 ),
                 const SizedBox(height: 32),
 
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildItemDetailsCard()),
-                    const SizedBox(width: 32),
-                    Expanded(child: _buildConditionPhotosCard()),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                const Divider(),
+                // ─── Item Details Card ───
+                _buildItemDetailsCard(),
                 const SizedBox(height: 24),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    ElevatedButton.icon(
+                // ─── Condition Photos Card ───
+                _buildConditionPhotosCard(),
+                const SizedBox(height: 32),
+
+                // ─── Grade Button (centered) ───
+                Center(
+                  child: SizedBox(
+                    width: 320,
+                    child: ElevatedButton(
                       onPressed: _isGrading ? null : _gradeItem,
-                      icon: _isGrading
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: amazonOrange,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: amazonOrange.withValues(alpha: 0.6),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isGrading
                           ? const SizedBox(
-                              height: 18,
-                              width: 18,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.auto_awesome),
-                      label: Text(
-                        _isGrading ? 'GRADING...' : 'GRADE ITEM',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 20,
-                        ),
-                      ),
+                          : const Text(
+                              'GRADE ITEM',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -236,156 +232,111 @@ class _SubmitItemViewState extends State<SubmitItemView> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          // Card header
+          Row(
             children: [
-              Icon(Icons.info_outline, color: Color(0xFF0F1111)),
-              SizedBox(width: 8),
-              Text(
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: amazonNavy.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.inventory_2_outlined, color: amazonNavy, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Text(
                 'Item Details',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F1111),
+                  color: textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 16),
-          _buildLabel('PRODUCT NAME'),
-          TextField(
-            controller: _productNameController,
-            decoration: const InputDecoration(
-              hintText: 'e.g., Apple iPad Pro 11-inch (3rd Gen)',
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+
+          // Product Name & Category row
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('CATEGORY'),
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _selectedCategory,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Electronics & Computers',
-                          child: Text('Electronics & Computers'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Home & Kitchen',
-                          child: Text('Home & Kitchen'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Beauty & Personal Care',
-                          child: Text('Beauty & Personal Care'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Clothing, Shoes & Jewelry',
-                          child: Text('Clothing, Shoes & Jewelry'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Health, Household & Baby Care',
-                          child: Text('Health, Household & Baby Care'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Books, Music, Movies & Video Games',
-                          child: Text('Books, Music, Movies & Video Games'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Toys, Kids & Baby',
-                          child: Text('Toys, Kids & Baby'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Sports, Outdoors & Fitness',
-                          child: Text('Sports, Outdoors & Fitness'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Automotive, Tools & Industrial',
-                          child: Text('Automotive, Tools & Industrial'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Grocery',
-                          child: Text('Grocery'),
-                        ),
-                      ],
-                      onChanged: (val) =>
-                          setState(() => _selectedCategory = val),
-                      hint: const Text('Select...'),
-                    ),
-                  ],
+                child: _buildTextField(
+                  label: 'Product Name',
+                  controller: _productNameController,
+                  hint: 'Enter product name',
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 20),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('REASON FOR RETURN'),
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _selectedReason,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Returned Amazon order',
-                          child: Text('Returned Amazon order'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Unused at home',
-                          child: Text('Unused at home'),
-                        ),
-                      ],
-                      onChanged: (val) => setState(() => _selectedReason = val),
-                      hint: const Text('Select...'),
-                    ),
+                child: _buildDropdownField(
+                  label: 'Category',
+                  value: _selectedCategory,
+                  hint: 'Select category',
+                  items: const [
+                    'Electronics & Computers',
+                    'Home & Kitchen',
+                    'Beauty & Personal Care',
+                    'Clothing, Shoes & Jewelry',
+                    'Health, Household & Baby Care',
+                    'Books, Music, Movies & Video Games',
+                    'Toys, Kids & Baby',
+                    'Sports, Outdoors & Fitness',
+                    'Automotive, Tools & Industrial',
+                    'Grocery',
                   ],
+                  onChanged: (val) => setState(() => _selectedCategory = val),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
+
+          // Reason & Order ID row
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('ORDER ID / COST (₹)'),
-                    TextField(
-                      controller: _orderOrPriceController,
-                      decoration: const InputDecoration(
-                        hintText: 'e.g., ORD-101 or 2999',
-                      ),
-                    ),
+                child: _buildDropdownField(
+                  label: 'Reason for Return',
+                  value: _selectedReason,
+                  hint: 'Select reason',
+                  items: const [
+                    'Returned Amazon order',
+                    'Unused at home',
                   ],
+                  onChanged: (val) => setState(() => _selectedReason = val),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 20),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('PINCODE / LOCATION'),
-                    TextField(
-                      controller: _pincodeController,
-                      decoration: const InputDecoration(
-                        hintText: 'e.g., 560001',
-                      ),
-                    ),
-                  ],
+                child: _buildTextField(
+                  label: 'Order ID / Cost (₹)',
+                  controller: _orderOrPriceController,
+                  hint: 'Enter order ID or cost',
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+
+          // Pincode (full width)
+          _buildTextField(
+            label: 'Pincode / Location',
+            controller: _pincodeController,
+            hint: 'Enter pincode or location',
           ),
         ],
       ),
@@ -397,107 +348,135 @@ class _SubmitItemViewState extends State<SubmitItemView> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Card header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.photo_camera_outlined, color: Color(0xFF0F1111)),
-                  SizedBox(width: 8),
-                  Text(
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: amazonOrange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.camera_alt_outlined, color: amazonOrange, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
                     'Condition Photos',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F1111),
+                      color: textPrimary,
                     ),
                   ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.grey.shade300),
+                  color: amazonOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: amazonOrange.withValues(alpha: 0.3)),
                 ),
                 child: const Text(
                   'Required',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: amazonOrange,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: _pickImages,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 48),
-              decoration: BoxDecoration(
-                color: _selectedImages.isNotEmpty
-                    ? const Color(0xFFFF9900).withValues(alpha: 0.05)
-                    : const Color(0xFFF9F9F9),
-                border: Border.all(
-                  color: _selectedImages.isNotEmpty
-                      ? const Color(0xFFFF9900)
-                      : Colors.grey.shade400,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: _selectedImages.isNotEmpty
-                        ? const Color(0xFFFF9900)
-                        : Colors.grey.shade200,
-                    child: Icon(
-                      _selectedImages.isNotEmpty ? Icons.check : Icons.upload,
-                      color: _selectedImages.isNotEmpty
-                          ? Colors.white
-                          : const Color(0xFF0F1111),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _selectedImages.isNotEmpty
-                        ? '${_selectedImages.length} Photo(s) Attached'
-                        : 'Click to upload high-res photos',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _selectedImages.isNotEmpty
-                        ? 'Click again to add more'
-                        : 'Supports JPG, PNG',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 24),
+
+          // Photo upload area and thumbnails row
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildThumbnail('Front', 0)),
+              // Main upload area
+              Expanded(
+                flex: 2,
+                child: InkWell(
+                  onTap: _pickImages,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 140,
+                    decoration: BoxDecoration(
+                      color: _selectedImages.isNotEmpty
+                          ? amazonOrange.withValues(alpha: 0.05)
+                          : Colors.grey.shade50,
+                      border: Border.all(
+                        color: _selectedImages.isNotEmpty
+                            ? amazonOrange
+                            : Colors.grey.shade300,
+                        width: 1.5,
+                        style: BorderStyle.solid,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _selectedImages.isNotEmpty ? Icons.check_circle : Icons.cloud_upload_outlined,
+                          size: 32,
+                          color: _selectedImages.isNotEmpty ? amazonOrange : amazonOrange,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _selectedImages.isNotEmpty
+                              ? '${_selectedImages.length} Photo(s) Attached'
+                              : 'Click to upload high-res photos',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _selectedImages.isNotEmpty ? amazonOrange : textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _selectedImages.isNotEmpty ? 'Click to add more' : 'Supports JPG, PNG',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: _buildThumbnail('Side', 1)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildThumbnail('Back', 2)),
+
+              // Thumbnail slots
+              Expanded(
+                flex: 3,
+                child: Row(
+                  children: [
+                    Expanded(child: _buildThumbnail('Front', 0)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildThumbnail('Side', 1)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildThumbnail('Back', 2)),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -505,55 +484,130 @@ class _SubmitItemViewState extends State<SubmitItemView> {
     );
   }
 
-  Widget _buildLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey.shade800,
-        letterSpacing: 1.0,
-      ),
-    ),
-  );
-
-  Widget _buildThumbnail(String label, int index) {
-    final bool hasImage = _selectedImages.length > index;
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+  }) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: hasImage
-                  ? const Color(0xFFFF9900).withValues(alpha: 0.1)
-                  : Colors.white,
-              border: Border.all(
-                color: hasImage
-                    ? const Color(0xFFFF9900)
-                    : Colors.grey.shade300,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Center(
-              child: Icon(
-                hasImage ? Icons.image : Icons.add_photo_alternate_outlined,
-                color: hasImage ? const Color(0xFFFF9900) : Colors.grey,
-              ),
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          hasImage ? "ATTACHED" : label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: hasImage ? const Color(0xFFFF9900) : Colors.black,
+        TextField(
+          controller: controller,
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: amazonNavy, width: 1.5),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String? value,
+    required String hint,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade600),
+          style: const TextStyle(fontSize: 14, color: textPrimary),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: amazonNavy, width: 1.5),
+            ),
+          ),
+          hint: Text(hint, style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+          items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThumbnail(String label, int index) {
+    final bool hasImage = _selectedImages.length > index;
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        color: hasImage ? amazonOrange.withValues(alpha: 0.05) : Colors.white,
+        border: Border.all(
+          color: hasImage ? amazonOrange : Colors.grey.shade300,
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            hasImage ? Icons.check_circle : Icons.camera_alt_outlined,
+            size: 28,
+            color: hasImage ? amazonOrange : Colors.grey.shade400,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: hasImage ? amazonOrange : Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
