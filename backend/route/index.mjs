@@ -113,6 +113,15 @@ const REASONABLE_DISTANCE_KM = 600;
 // frontend (lib/data/route_helpers.dart).
 const DONATE_RESALE_CEILING = 1000;
 
+// A clean, valuable customer return is worth sending back to the origin/seller
+// warehouse for restock/credit rather than reselling it locally. Any warehouse
+// customer return in good condition whose resale value is at or above this
+// floor is routed to ReturnToOrigin (still operator-overridable). Low-value
+// returns fall through to the resell/donate/recycle ladder.
+const RETURN_TO_ORIGIN_VALUE_FLOOR = Number(
+  process.env.RETURN_TO_ORIGIN_VALUE_FLOOR || 3000
+);
+
 /**
  * Scores a single allowed route. Higher is better.
  *   routeScore = net-value score + condition + confidence + route fit - cost burden
@@ -189,8 +198,11 @@ function decideRouteDynamic({
   );
 
   // -------------------------------------------------------------------------
-  // ReturnToOrigin (warehouse-only): take this path early when the economics
-  // genuinely favour bouncing the item back to the origin/seller warehouse.
+  // ReturnToOrigin (warehouse-only): a clean, VALUABLE customer return is worth
+  // sending back to the origin/seller warehouse for restock/credit instead of
+  // reselling it locally. Driven primarily by item value — high-value returns
+  // go back to origin; low-value ones fall through to the resell/donate/recycle
+  // ladder. Still guarded so we never return the item at a net loss.
   // -------------------------------------------------------------------------
   const originReturnNet =
     originRecoveryValue -
@@ -198,6 +210,9 @@ function decideRouteDynamic({
     localHandlingCost -
     originRestockingFee -
     delayRiskBuffer;
+
+  const returnValue =
+    estimatedResaleValue > 0 ? estimatedResaleValue : asIsResaleValue;
 
   const returnToOriginEligible =
     isWarehouseFlow &&
@@ -209,10 +224,8 @@ function decideRouteDynamic({
     confidence >= 0.65 &&
     refurbishmentNeeded !== "major_repair" &&
     !hasDirectResaleBlockers &&
-    originReturnNet >= minimumProfitThreshold &&
-    originReturnNet >= directResellNet * 1.10 &&
-    originReturnNet >= refurbishNet * 1.10 &&
-    originReturnNet >= recycleNet;
+    returnValue >= RETURN_TO_ORIGIN_VALUE_FLOOR &&
+    originReturnNet >= 0;
 
   if (returnToOriginEligible) return "ReturnToOrigin";
 
