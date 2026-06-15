@@ -515,12 +515,19 @@ export const handler = async (event) => {
     return response(400, { error: "Invalid JSON body." });
   }
 
-  // Extract auth context (from API Gateway Cognito authorizer claims, with body fallback)
-  const claims = event.requestContext?.authorizer?.claims || {};
-  const authContext = {
-    userId: claims.sub || body.userId || null,
-    userRole: claims["custom:role"] || body.userRole || null,
-  };
+  // Identity comes from the Cognito JWT authorizer claims (server-trusted),
+  // never the request body. Seller routes are JWT-gated at API Gateway.
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
+    {};
+  const callerId = claims.sub;
+  const callerRole = claims["custom:role"];
+  if (!callerId) return response(401, { error: "Authentication required." });
+  if (callerRole !== "customer" && callerRole !== "warehouse") {
+    return response(403, { error: "Not authorized for seller actions." });
+  }
+  const authContext = { userId: callerId, userRole: callerRole };
 
   const orderOrPrice = body.orderOrPrice;
 

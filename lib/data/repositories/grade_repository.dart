@@ -54,6 +54,17 @@ class GradeRepository {
   static const String _notificationsUrl = '$_baseUrl/notifications';
   static const String _feedbackUrl = '$_baseUrl/feedback';
 
+  /// Headers for authenticated (seller/buyer) endpoints: JSON + the Cognito
+  /// ID token as a Bearer credential when signed in. The seller routes are now
+  /// JWT-gated at API Gateway, so this token is required for them.
+  Map<String, String> _authHeaders() {
+    final token = Session.idToken;
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
   /// Uploads a single image to S3 via a presigned URL and returns the public
   /// object URL (to be stored as a photoUrl on the evaluation).
   Future<String> uploadPhoto({
@@ -64,7 +75,7 @@ class GradeRepository {
     // 1. Ask the backend for a presigned PUT URL
     final presignResp = await http.post(
       Uri.parse(_uploadUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: _authHeaders(),
       body: jsonEncode({'fileName': fileName, 'contentType': contentType}),
     );
     if (presignResp.statusCode < 200 || presignResp.statusCode >= 300) {
@@ -112,7 +123,7 @@ class GradeRepository {
     try {
       response = await http.post(
         Uri.parse(_gradeUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: jsonEncode(body),
       );
     } catch (e) {
@@ -149,7 +160,7 @@ class GradeRepository {
     try {
       response = await http.post(
         Uri.parse(_aiGradeUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: jsonEncode({'evaluationId': evaluationId}),
       );
     } catch (e) {
@@ -182,7 +193,7 @@ class GradeRepository {
     try {
       response = await http.post(
         Uri.parse(_routeUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: jsonEncode({'evaluationId': evaluationId}),
       );
     } catch (e) {
@@ -217,7 +228,7 @@ class GradeRepository {
     try {
       response = await http.post(
         Uri.parse(_routeConfirmUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: jsonEncode({
           'evaluationId': evaluationId,
           'chosenDisposition': chosenDisposition,
@@ -259,10 +270,7 @@ class GradeRepository {
     final uri = Uri.parse(_evaluationsUrl).replace(queryParameters: params);
     late http.Response response;
     try {
-      response = await http.get(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-      );
+      response = await http.get(uri, headers: _authHeaders());
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -549,7 +557,7 @@ class GradeRepository {
     try {
       response = await http.post(
         Uri.parse(_feedbackUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders(),
         body: jsonEncode({
           'evaluationId': evaluationId,
           'feedbackType': feedbackType,

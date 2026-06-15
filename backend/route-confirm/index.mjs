@@ -128,6 +128,16 @@ export const handler = async (event) => {
     return response(400, { error: "Invalid JSON body." });
   }
 
+  // Require an authenticated seller (JWT authorizer claims).
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
+    {};
+  if (!claims.sub) return response(401, { error: "Authentication required." });
+  if (claims["custom:role"] !== "customer" && claims["custom:role"] !== "warehouse") {
+    return response(403, { error: "Not authorized for seller actions." });
+  }
+
   const evaluationId = body.evaluationId;
   const chosenDisposition = body.chosenDisposition;
 

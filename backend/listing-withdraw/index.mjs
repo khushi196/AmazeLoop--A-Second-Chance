@@ -132,12 +132,17 @@ export const handler = async (event) => {
     return response(400, { error: "evaluationId is required." });
   }
 
-  const restClaims = event?.requestContext?.authorizer?.claims;
-  const httpClaims = event?.requestContext?.authorizer?.jwt?.claims;
-  const claims = restClaims || httpClaims || {};
-  const sellerId = claims.sub || body.userId;
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
+    {};
+  const sellerId = claims.sub;
+  const callerRole = claims["custom:role"];
   if (!sellerId) {
-    return response(401, { error: "Missing seller identity. Authentication required." });
+    return response(401, { error: "Authentication required." });
+  }
+  if (callerRole !== "customer" && callerRole !== "warehouse") {
+    return response(403, { error: "Not authorized for seller actions." });
   }
 
   // 1. Fetch the evaluation

@@ -32,8 +32,16 @@ export const handler = async (event) => {
 
   // Prefer userId from Cognito authorizer claims if present (prevents IDOR),
   // otherwise fall back to the query param (API Gateway has no authorizer yet).
-  const claims = event.requestContext?.authorizer?.claims || {};
-  const userId = claims.sub || params.userId;
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event.requestContext?.authorizer?.claims ||
+    {};
+  const callerRole = claims["custom:role"];
+  if (!claims.sub) return response(401, { error: "Authentication required." });
+  if (callerRole !== "customer" && callerRole !== "warehouse") {
+    return response(403, { error: "Not authorized for seller actions." });
+  }
+  const userId = claims.sub;
 
   if (!userId && !warehouseId) {
     return response(400, { error: "userId or warehouseId query parameter is required." });
