@@ -56,11 +56,6 @@ flutter run -d chrome        # boots to the role-selection screen
 - **Sell side:** "Sell / Trade-in" → sign up → upload photos → watch grade → route → confirm → Health
   Card (downloadable PDF). A confirmed *Resell* item appears on the marketplace immediately.
 
-Public backend smoke test (no auth):
-```bash
-curl https://bu719hnik3.execute-api.ap-south-1.amazonaws.com/listings
-```
-
 ---
 
 ## Table of contents
