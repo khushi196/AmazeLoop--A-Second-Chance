@@ -631,5 +631,3 @@ when deploying.
   streamline the circular "every item can have multiple lives" flow.
 
 ---
-
-*Built for the AmazeLoop — Build for Tomorrow hackathon.*
